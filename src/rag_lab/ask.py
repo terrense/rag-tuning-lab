@@ -1,4 +1,11 @@
-"""L1 CLI: retrieve + generate a grounded, cited answer (RAG end-to-end)."""
+"""
+================================================================================
+ask.py —— L1 命令行入口：检索 + 生成（完整 RAG 问答）
+--------------------------------------------------------------------------------
+用法：python -m rag_lab.ask --config configs/diseases.yaml --query "苯中毒怎么治？"
+比 query 多了一步：检索完，把命中喂给 MiniMax M3 生成带引用的答案。
+================================================================================
+"""
 
 from __future__ import annotations
 
@@ -23,6 +30,7 @@ def main() -> None:
         key, raw_value = item.split("=", 1)
         set_dotted(cfg, key, parse_value(raw_value))
 
+    # 问题来自 --query 或题库 --query-id
     query = args.query
     if args.query_id:
         item = find_query(load_eval_queries(get_path(cfg, "eval_queries")), args.query_id)
@@ -30,9 +38,10 @@ def main() -> None:
     if not query:
         raise SystemExit("Pass --query or --query-id.")
 
-    result = query_config(cfg, query)
-    gen = generate_answer(cfg, query, result["hits"])
+    result = query_config(cfg, query)                  # 第一步：检索
+    gen = generate_answer(cfg, query, result["hits"])  # 第二步：基于命中生成答案
 
+    # 打印答案 + 引用来源 + 用量
     print(f"问题：{query}\n")
     print("回答：")
     print(gen["answer"])

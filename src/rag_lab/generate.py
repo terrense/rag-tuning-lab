@@ -1,17 +1,18 @@
-"""L1: answer generation with citations, grounded on retrieved chunks.
+"""
+================================================================================
+generate.py —— L1：基于检索结果生成“带引用”的答案
+--------------------------------------------------------------------------------
+LLM 用 MiniMax M3（OpenAI 兼容的 chat-completions 接口）。全部配置/环境驱动，
+方便改 endpoint 和模型名：
+    MINIMAX_API_KEY   （必填，放 .env，永不提交）
+    MINIMAX_BASE_URL  （默认 https://api.minimaxi.com/v1）
+    MINIMAX_MODEL     （默认 MiniMax-M3）
 
-The LLM is MiniMax M3 via its OpenAI-compatible chat-completions API. Everything
-is config/env driven so the endpoint and model id are easy to adjust:
-
-    MINIMAX_API_KEY   (required, kept in .env — never committed)
-    MINIMAX_BASE_URL  (default https://api.minimaxi.com/v1)
-    MINIMAX_MODEL     (default MiniMax-M3)
-
-Design choices:
-- Strictly grounded: the system prompt forbids using outside knowledge and asks
-  the model to say so when the context is insufficient.
-- Citations: each retrieved chunk is numbered [1..k]; the model must cite the
-  numbers it used, so answers stay traceable to sources.
+两条设计原则：
+  - 严格“接地”(grounded)：system 提示禁止用资料之外的知识，资料不足要明说。
+  - 引用：把检索到的每个块编号 [1..k]，要求模型在结论后标注用到的编号，
+    这样答案可溯源到具体资料。
+================================================================================
 """
 
 from __future__ import annotations
@@ -23,18 +24,19 @@ from typing import Any
 
 from rag_lab.models import SearchHit
 
-# MiniMax M3 is a reasoning model: it emits a <think>...</think> block before the
-# answer. Strip it so callers see only the final answer.
+# MiniMax M3 是“推理模型”：答案前会先输出一段 <think>...</think> 思考。
+# 这个正则用来把思考块剥掉，只留最终答案。
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 def _strip_think(text: str) -> str:
+    """去掉 <think>...</think>。若思考块被截断（只有开头没结尾），丢弃其前缀。"""
     cleaned = _THINK_RE.sub("", text)
-    # If the block was truncated (open <think> with no close), drop the prefix.
     if "<think>" in cleaned:
         cleaned = cleaned.split("</think>")[-1].replace("<think>", "")
     return cleaned.strip()
 
+# 系统提示词：约束模型“只用资料、可溯源、医疗免责”
 SYSTEM_PROMPT = (
     "你是一个严谨的中文医学知识助手。只能依据【资料】中的内容回答问题，"
     "不得使用资料之外的知识，也不得编造资料中没有的信息。"
@@ -45,13 +47,13 @@ SYSTEM_PROMPT = (
 
 
 def _load_dotenv(path: str | Path = ".env") -> None:
-    """Minimal .env loader (KEY=VALUE lines); does not overwrite existing env."""
+    """极简 .env 加载器（按 KEY=VALUE 逐行读）。不覆盖已存在的环境变量。"""
     p = Path(path)
     if not p.exists():
         return
     for line in p.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+        if not line or line.startswith("#") or "=" not in line:   # 跳过空行/注释
             continue
         key, value = line.split("=", 1)
         key, value = key.strip(), value.strip()
@@ -60,19 +62,20 @@ def _load_dotenv(path: str | Path = ".env") -> None:
 
 
 def build_context(hits: list[SearchHit], max_chars: int = 600) -> tuple[str, list[dict]]:
-    """Number the retrieved chunks into a context block + a sources list."""
+    """把检索到的若干块编号拼成“资料区块”文本，同时返回引用来源清单。"""
     blocks: list[str] = []
     sources: list[dict] = []
     for i, hit in enumerate(hits, start=1):
         title = hit.title or hit.source_id
-        text = (hit.text or "")[:max_chars]
-        blocks.append(f"[{i}] {title}\n{text}")
+        text = (hit.text or "")[:max_chars]            # 每块最多取 max_chars，控制 prompt 长度
+        blocks.append(f"[{i}] {title}\n{text}")        # 编号 [i] 供模型引用
         sources.append({"n": i, "source_id": hit.source_id, "title": title})
     return "\n\n".join(blocks), sources
 
 
 def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> dict[str, Any]:
-    _load_dotenv()
+    """给定问题 + 检索到的块，调 MiniMax M3 生成带引用的答案。"""
+    _load_dotenv()                                      # 先把 .env 里的 key 读进环境变量
     gen_cfg = cfg.get("generation", {})
     api_key = os.environ.get("MINIMAX_API_KEY", "")
     base_url = os.environ.get("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1").rstrip("/")
@@ -82,6 +85,7 @@ def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> d
             "MINIMAX_API_KEY not set. Put it in .env (gitignored) as MINIMAX_API_KEY=..."
         )
 
+    # 拼 user 提示：问题 + 资料区块
     context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
     user_prompt = (
         f"问题：{query}\n\n"
@@ -94,24 +98,26 @@ def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> d
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("generation needs 'requests'. Run: pip install requests") from exc
 
+    # 组装 OpenAI 兼容的请求体
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
-        "temperature": float(gen_cfg.get("temperature", 0.2)),
-        # Budget covers the <think> reasoning block plus the final answer.
+        "temperature": float(gen_cfg.get("temperature", 0.2)),    # 低温度，答案更稳定
+        # max_tokens 要够大：既要装下 <think> 思考，又要装下最终答案，否则会被截断
         "max_tokens": int(gen_cfg.get("max_tokens", 2048)),
     }
+    # 发请求（Bearer 鉴权）
     resp = requests.post(
         f"{base_url}/chat/completions",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
         timeout=float(gen_cfg.get("timeout", 60)),
     )
-    resp.raise_for_status()
+    resp.raise_for_status()                              # 非 2xx 直接抛错
     data = resp.json()
     raw = data["choices"][0]["message"]["content"]
-    answer = _strip_think(raw)
+    answer = _strip_think(raw)                           # 剥掉思考块，只留答案
     return {"answer": answer, "sources": sources, "model": model, "raw_usage": data.get("usage")}

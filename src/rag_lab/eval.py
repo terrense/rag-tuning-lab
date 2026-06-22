@@ -1,9 +1,11 @@
-"""Batch evaluation over an eval-query set.
-
-Runs every query in `paths.eval_queries` through the retrieval pipeline and
-reports per-query hit/first_rank/MRR plus aggregate hit-rate and mean MRR.
-This is the "use numbers, not vibes" loop: change a knob with --set, re-run,
-compare the aggregate.
+"""
+================================================================================
+eval.py —— 批量评测（简版）
+--------------------------------------------------------------------------------
+把题库里每道题都跑一遍检索，打印每题的 hit/first_rank/MRR + 总体命中率/平均MRR。
+这是“用数字代替感觉”的最小闭环：--set 改个参数 → 重跑 → 看总体指标变化。
+（要更全面的多阶段指标 + 历史追踪，用 rag_lab.experiment。）
+================================================================================
 """
 
 from __future__ import annotations
@@ -17,13 +19,14 @@ from rag_lab.pipeline import evaluate_hits, query_config
 
 
 def run_eval(cfg: dict) -> dict:
+    """跑完整个题库，返回每题结果 + 汇总（命中率、平均 MRR）。"""
     queries = load_eval_queries(get_path(cfg, "eval_queries"))
     rows = []
     for item in queries:
         question = str(item["question"])
         expected = list(item.get("expected_source_ids", []))
-        result = query_config(cfg, question)
-        ev = evaluate_hits(result["hits"], expected)
+        result = query_config(cfg, question)          # 跑检索
+        ev = evaluate_hits(result["hits"], expected)  # 算这题的指标
         rows.append(
             {
                 "id": item.get("id"),
@@ -35,8 +38,8 @@ def run_eval(cfg: dict) -> dict:
             }
         )
     n = len(rows) or 1
-    hit_rate = sum(1 for r in rows if r["hit"]) / n
-    mean_mrr = sum(r["mrr"] for r in rows) / n
+    hit_rate = sum(1 for r in rows if r["hit"]) / n    # 命中率 = 命中题数 / 总题数
+    mean_mrr = sum(r["mrr"] for r in rows) / n         # 平均 MRR
     return {"rows": rows, "hit_rate": hit_rate, "mean_mrr": mean_mrr, "count": len(rows)}
 
 
@@ -48,7 +51,7 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = load_config(args.config)
-    for item in args.set:
+    for item in args.set:                              # 命令行覆盖配置
         key, raw_value = item.split("=", 1)
         set_dotted(cfg, key, parse_value(raw_value))
 
@@ -58,6 +61,7 @@ def main() -> None:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return
 
+    # 美化打印：每题一行，未命中的额外显示它实际召回了啥（方便排查）
     print(f"Eval over {summary['count']} queries  "
           f"(config={args.config}, rerank={cfg['rerank'].get('mode')}, "
           f"prepend_title={cfg['chunking'].get('prepend_title', False)})")
