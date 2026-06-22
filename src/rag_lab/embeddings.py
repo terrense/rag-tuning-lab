@@ -75,10 +75,18 @@ class SentenceTransformerEmbedder:
         return np.asarray(vectors, dtype=np.float32).tolist()
 
 
+# Loading a SentenceTransformer is seconds-expensive; cache by model name so
+# repeated queries / batch eval don't reload it every call.
+_EMBEDDER_CACHE: dict[str, Embedder] = {}
+
+
 def get_embedder(cfg: dict) -> Embedder:
     provider = str(cfg["embedding"].get("provider", "hashing")).lower()
     if provider in {"sentence-transformers", "sentence_transformers", "st"}:
-        return SentenceTransformerEmbedder(cfg)
+        key = str(cfg["embedding"]["model"])
+        if key not in _EMBEDDER_CACHE:
+            _EMBEDDER_CACHE[key] = SentenceTransformerEmbedder(cfg)
+        return _EMBEDDER_CACHE[key]
     if provider == "hashing":
         return HashingEmbedder(cfg)
     raise ValueError(f"Unsupported embedding.provider: {provider}")

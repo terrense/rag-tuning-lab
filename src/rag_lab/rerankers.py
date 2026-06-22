@@ -56,14 +56,24 @@ def rerank_hits(query: str, hits: list[SearchHit], cfg: dict) -> list[SearchHit]
     return sorted(updated, key=lambda hit: hit.score, reverse=True)[:top_k]
 
 
+# Cache CrossEncoder models by name — loading one per query is the main cost.
+_CE_CACHE: dict = {}
+
+
+def _get_cross_encoder(model_name: str):
+    if model_name not in _CE_CACHE:
+        try:
+            from sentence_transformers import CrossEncoder
+        except ImportError as exc:
+            raise RuntimeError(
+                "cross_encoder rerank needs sentence-transformers. Run: pip install -r requirements-transformers.txt"
+            ) from exc
+        _CE_CACHE[model_name] = CrossEncoder(model_name)
+    return _CE_CACHE[model_name]
+
+
 def _cross_encoder_scores(query: str, hits: list[SearchHit], cfg: dict) -> list[float]:
-    try:
-        from sentence_transformers import CrossEncoder
-    except ImportError as exc:
-        raise RuntimeError(
-            "cross_encoder rerank needs sentence-transformers. Run: pip install -r requirements-transformers.txt"
-        ) from exc
     model_name = str(cfg["rerank"].get("model") or "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
-    model = CrossEncoder(model_name)
+    model = _get_cross_encoder(model_name)
     pairs = [(query, hit.text) for hit in hits]
     return [float(score) for score in model.predict(pairs)]

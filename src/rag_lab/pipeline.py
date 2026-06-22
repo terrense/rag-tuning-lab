@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,23 @@ from rag_lab.loaders import load_chunks, load_corpus, save_chunks
 from rag_lab.models import Chunk, SearchHit
 from rag_lab.rerankers import rerank_hits
 from rag_lab.stores import get_store
+
+# Cache loaded chunks + the BM25 index per chunks-cache file (keyed by mtime),
+# so batch eval / repeated queries don't reload 27k chunks and rebuild BM25
+# every single call. Invalidated automatically when the cache file changes.
+_RETRIEVAL_CACHE: dict[str, tuple[float, list[Chunk], dict[str, Chunk], BM25Index]] = {}
+
+
+def _get_retrieval_assets(chunks_path: Path) -> tuple[list[Chunk], dict[str, Chunk], BM25Index]:
+    key = str(chunks_path)
+    mtime = os.path.getmtime(chunks_path)
+    cached = _RETRIEVAL_CACHE.get(key)
+    if cached is None or cached[0] != mtime:
+        chunks = load_chunks(chunks_path)
+        lookup = {chunk.id: chunk for chunk in chunks}
+        _RETRIEVAL_CACHE[key] = (mtime, chunks, lookup, BM25Index(chunks))
+    _, chunks, lookup, bm25 = _RETRIEVAL_CACHE[key]
+    return chunks, lookup, bm25
 
 
 def ingest_config(cfg: dict[str, Any]) -> dict[str, Any]:
@@ -42,8 +60,7 @@ def query_config(cfg: dict[str, Any], query: str) -> dict[str, Any]:
     chunks_path = get_path(cfg, "chunks_cache")
     if not Path(chunks_path).exists():
         raise FileNotFoundError(f"Chunks cache not found: {chunks_path}. Run ingest first.")
-    chunks = load_chunks(chunks_path)
-    chunk_lookup = {chunk.id: chunk for chunk in chunks}
+    chunks, chunk_lookup, bm25_index = _get_retrieval_assets(chunks_path)
     embedder = get_embedder(cfg)
     query_embedding = embedder.embed([query])[0]
     store = get_store(cfg, dimension=len(query_embedding), reset=False)
@@ -51,7 +68,7 @@ def query_config(cfg: dict[str, Any], query: str) -> dict[str, Any]:
     retrieval_cfg = cfg["retrieval"]
     candidate_k = int(retrieval_cfg.get("candidate_k", 12))
     vector_hits = store.search(query_embedding, top_k=candidate_k)
-    bm25_hits = BM25Index(chunks).search(query, top_k=candidate_k)
+    bm25_hits = bm25_index.search(query, top_k=candidate_k)
     if bool(retrieval_cfg.get("hybrid", True)):
         candidates = combine_hits(
             vector_hits=vector_hits,
