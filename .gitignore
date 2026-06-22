@@ -1,0 +1,24 @@
+.venv/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+
+# Lab outputs
+storage/chroma/
+storage/chunks*.jsonl
+storage/milvus/
+infra/milvus/volumes/
+
+# User-provided documents can be large or private.
+data/docs/*
+!data/docs/.gitkeep
+!data/docs/README.md
+
+# Large / potentially licensed datasets — keep out of the public repo.
+data/files/数据集/
+
+# Local notebooks/checkpoints
+.ipynb_checkpoints/

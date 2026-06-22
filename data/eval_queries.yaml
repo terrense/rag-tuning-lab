@@ -1,0 +1,33 @@
+queries:
+  - id: q_chunk
+    question: "为什么 RAG 的 chunk 太大或太小都会影响召回？overlap 一般怎么调？"
+    expected_source_ids: ["chunking_001"]
+    interview_angle: "考察 chunk size、overlap、上下文完整性和噪声之间的 trade-off。"
+  - id: q_hybrid
+    question: "向量检索为什么经常找不到版本号、错误码、字段名？怎么解决？"
+    expected_source_ids: ["hybrid_001"]
+    interview_angle: "考察 dense retrieval 与 BM25/keyword 的互补，以及 hybrid search 融合方式。"
+  - id: q_rerank
+    question: "为什么已经做了向量召回还要加 rerank？candidate_k 应该怎么理解？"
+    expected_source_ids: ["rerank_001", "latency_001"]
+    interview_angle: "考察 bi-encoder 粗排、cross-encoder 精排，以及质量和延迟权衡。"
+  - id: q_eval
+    question: "如果要系统性优化 RAG，你会用哪些离线指标，而不是只看感觉？"
+    expected_source_ids: ["eval_001", "failure_001"]
+    interview_angle: "考察 hit@k、MRR、nDCG、groundedness、失败样例分析。"
+  - id: q_acl
+    question: "企业知识库 RAG 怎么避免把无权限文档召回给用户？"
+    expected_source_ids: ["metadata_001", "security_001"]
+    interview_angle: "考察 metadata filter、ACL、租户隔离、pre-filter/post-filter。"
+  - id: q_freshness
+    question: "知识库更新了，为什么 RAG 还可能回答旧内容？你怎么排查？"
+    expected_source_ids: ["freshness_001", "failure_001"]
+    interview_angle: "考察增量索引、删除旧向量、缓存和多环境发布。"
+  - id: q_latency
+    question: "线上 RAG 延迟高，你会从哪些环节优化？"
+    expected_source_ids: ["latency_001", "cache_001"]
+    interview_angle: "考察链路拆解、缓存、candidate_k、rerank 批处理和索引参数。"
+  - id: q_graph
+    question: "GraphRAG 什么时候比普通 RAG 更合适？它的代价是什么？"
+    expected_source_ids: ["graph_001"]
+    interview_angle: "考察跨文档多跳、实体关系、全局摘要和工程复杂度。"

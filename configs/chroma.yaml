@@ -1,0 +1,50 @@
+project:
+  name: rag_tuning_lab
+
+paths:
+  corpus: data/interview_cards.jsonl
+  docs_dir: data/docs
+  eval_queries: data/eval_queries.yaml
+  chunks_cache: storage/chunks_chroma.jsonl
+  chroma_dir: storage/chroma
+
+source:
+  include_interview_cards: true
+  include_docs_dir: true
+
+vector_store:
+  type: chroma
+  collection: rag_lab_chroma
+  reset_on_ingest: true
+  metric: cosine
+
+embedding:
+  provider: hashing
+  dimension: 768
+  analyzer: char_wb
+  ngram_min: 2
+  ngram_max: 4
+  normalize: true
+  model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+chunking:
+  strategy: paragraph
+  chunk_size: 360
+  chunk_overlap: 80
+
+retrieval:
+  candidate_k: 12
+  top_k: 5
+  hybrid: true
+  vector_weight: 0.7
+  bm25_weight: 0.3
+  rrf_k: 60
+
+rerank:
+  mode: bm25
+  top_k: 5
+  weight: 0.45
+  model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+
+display:
+  snippet_chars: 220

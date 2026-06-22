@@ -1,0 +1,3 @@
+# Kept for older environments. The main environment now includes sentence-transformers.
+sentence-transformers>=3.0
+torch

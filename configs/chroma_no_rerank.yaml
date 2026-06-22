@@ -1,0 +1,43 @@
+project:
+  name: rag_tuning_lab
+
+paths:
+  corpus: data/interview_cards.jsonl
+  eval_queries: data/eval_queries.yaml
+  chunks_cache: storage/chunks_chroma.jsonl
+  chroma_dir: storage/chroma
+
+vector_store:
+  type: chroma
+  collection: rag_lab_chroma_no_rerank
+  reset_on_ingest: true
+  metric: cosine
+
+embedding:
+  provider: hashing
+  dimension: 768
+  analyzer: char_wb
+  ngram_min: 2
+  ngram_max: 4
+  normalize: true
+
+chunking:
+  strategy: paragraph
+  chunk_size: 360
+  chunk_overlap: 80
+
+retrieval:
+  candidate_k: 12
+  top_k: 5
+  hybrid: true
+  vector_weight: 0.7
+  bm25_weight: 0.3
+  rrf_k: 60
+
+rerank:
+  mode: none
+  top_k: 5
+  weight: 0.0
+
+display:
+  snippet_chars: 220
