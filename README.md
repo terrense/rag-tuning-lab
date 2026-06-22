@@ -1,6 +1,8 @@
 # RAG Tuning Lab
 
-这个项目是一个 RAG 调参实验台。你主要用一个配置：
+这个项目是一个 RAG 调参实验台。它也是一个**干中学**的渐进式项目，目标是把检索能力从纯文本一步步扩展到多模态——详见 [ROADMAP.md](ROADMAP.md)。
+
+你主要用一个配置：
 
 ```powershell
 configs/play.yaml

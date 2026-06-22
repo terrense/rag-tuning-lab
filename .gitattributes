@@ -1,0 +1,22 @@
+# Normalize line endings: store as LF in the repo, check out native on each OS.
+* text=auto
+
+# Windows-only scripts stay CRLF in the working tree.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Always LF for these, regardless of platform.
+*.py   text eol=lf
+*.sh   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+*.toml text eol=lf
+
+# Treat as binary (no EOL munging, no diff noise).
+*.jsonl  -text
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary

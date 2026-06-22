@@ -20,5 +20,12 @@ data/docs/*
 # Large / potentially licensed datasets — keep out of the public repo.
 data/files/数据集/
 
+# Source document corpus (papers, personal docs, scans) — large and/or
+# copyrighted. Keep out of the public repo; only small generic templates stay.
+data/files/*.pdf
+data/files/**/*.pdf
+data/files/**/*.docx
+data/files/**/*.xlsx
+
 # Local notebooks/checkpoints
 .ipynb_checkpoints/
