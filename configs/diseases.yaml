@@ -38,11 +38,14 @@ chunking:
   prepend_title: true
 
 retrieval:
-  candidate_k: 12
+  # Tuned on the disease eval set (see experiments/LEADERBOARD.md):
+  # candidate_k 12->50 lifted Recall@5 0.30->0.60; bm25-heavy weights (BM25 is
+  # the stronger channel on this Chinese medical corpus) lifted it to 0.70.
+  candidate_k: 50
   top_k: 5
   hybrid: true
-  vector_weight: 0.7
-  bm25_weight: 0.3
+  vector_weight: 0.4
+  bm25_weight: 0.6
   rrf_k: 60
 
 rerank:
@@ -50,6 +53,8 @@ rerank:
   model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
   top_k: 5
   weight: 0.45
+  # Rerank only the top 20 of the 50-candidate pool to cap cross-encoder latency.
+  input_k: 20
 
 display:
   snippet_chars: 220

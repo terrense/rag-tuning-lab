@@ -54,6 +54,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "top_k": 5,
         "weight": 0.45,
         "model": "",
+        # Only rerank the top input_k of the fused pool (0 = whole pool). Caps
+        # the cross-encoder cost independently of candidate_k.
+        "input_k": 0,
     },
     "display": {"snippet_chars": 220},
     "generation": {

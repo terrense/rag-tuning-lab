@@ -83,7 +83,11 @@ def query_config(cfg: dict[str, Any], query: str) -> dict[str, Any]:
 
     top_k = int(retrieval_cfg.get("top_k", 5))
     candidates = sorted(candidates, key=lambda hit: hit.score, reverse=True)[:candidate_k]
-    final_hits = rerank_hits(query, candidates, cfg)[:top_k]
+    # Keep a large recall pool (candidate_k) for fusion, but only feed the top
+    # `rerank.input_k` of it to the (expensive, per-candidate) cross-encoder.
+    # input_k=0 means "rerank the whole pool" (backward-compatible default).
+    rerank_input_k = int(cfg["rerank"].get("input_k", 0)) or candidate_k
+    final_hits = rerank_hits(query, candidates[:rerank_input_k], cfg)[:top_k]
     return {
         "query": query,
         "hits": final_hits,
