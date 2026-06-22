@@ -29,6 +29,8 @@ def main() -> None:
     print(f"  cards       : {counts.get('interview_cards', 0)}")
     print(f"  files       : {counts.get('files', 0)}")
     print(f"  pdf pages   : {counts.get('pdf_pages', 0)}")
+    print(f"  structured  : {counts.get('structured_records', 0)} records "
+          f"from {counts.get('structured_files', 0)} dataset(s)")
     print(f"  total docs  : {len(docs)}")
     print("Supported file types")
     print("  " + ", ".join(sorted(SUPPORTED_DOC_EXTENSIONS)))

@@ -19,6 +19,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "source": {
         "include_interview_cards": True,
         "include_docs_dir": True,
+        # L0 structured datasets: list of {format, path, max_records?} specs.
+        "structured": [],
     },
     "vector_store": {
         "type": "chroma",

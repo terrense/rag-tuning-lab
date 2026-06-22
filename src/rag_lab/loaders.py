@@ -44,6 +44,13 @@ def load_corpus(cfg: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, in
         docs.extend(file_docs)
         counts.update(file_counts)
 
+    if source_cfg.get("structured"):
+        from rag_lab.structured import load_structured_sources
+
+        structured_docs, structured_counts = load_structured_sources(cfg)
+        docs.extend(structured_docs)
+        counts.update(structured_counts)
+
     return docs, counts
 
 

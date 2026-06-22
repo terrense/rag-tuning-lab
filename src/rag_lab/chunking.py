@@ -59,6 +59,9 @@ def make_chunks(docs: list[dict[str, Any]], cfg: dict[str, Any]) -> list[Chunk]:
     strategy = str(chunk_cfg.get("strategy", "paragraph")).lower()
     size = int(chunk_cfg.get("chunk_size", 360))
     overlap = int(chunk_cfg.get("chunk_overlap", 80))
+    # When true, the doc title (e.g. a disease name) is repeated at the head of
+    # every chunk, so attribute-only chunks still carry the entity they describe.
+    prepend_title = bool(chunk_cfg.get("prepend_title", False))
 
     chunks: list[Chunk] = []
     for doc in docs:
@@ -67,16 +70,20 @@ def make_chunks(docs: list[dict[str, Any]], cfg: dict[str, Any]) -> list[Chunk]:
         tags = doc.get("tags", [])
         tags_text = ",".join(str(tag) for tag in tags)
         extra_metadata = dict(doc.get("metadata", {}))
-        text = _clean_text(f"{title}\n\n{doc.get('content', '')}")
+        content = doc.get("content", "")
+        # Without prepend_title the title is part of the text once (legacy
+        # behaviour: it only lands in the first chunk).
+        text = _clean_text(content if prepend_title else f"{title}\n\n{content}")
         if strategy == "fixed":
             pieces = _fixed_windows(text, size=size, overlap=overlap)
         else:
             pieces = _paragraph_chunks(text, size=size, overlap=overlap)
         for idx, piece in enumerate(pieces):
+            chunk_text = f"{title}\n{piece}" if prepend_title else piece
             chunks.append(
                 Chunk(
                     id=f"{doc_id}::chunk_{idx:03d}",
-                    text=piece,
+                    text=chunk_text,
                     metadata={
                         "source_id": doc_id,
                         "title": title,

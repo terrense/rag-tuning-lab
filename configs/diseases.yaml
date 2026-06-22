@@ -1,0 +1,55 @@
+project:
+  name: rag_tuning_lab_diseases
+
+paths:
+  eval_queries: data/eval_queries.yaml
+  chunks_cache: storage/chunks_diseases.jsonl
+  chroma_dir: storage/chroma
+
+source:
+  # Pure structured corpus: no interview cards, no docs dir.
+  include_interview_cards: false
+  include_docs_dir: false
+  structured:
+    - format: disease_json
+      path: data/files/数据集/diseases_clean.json
+      # First runs cap the record count for fast iteration.
+      # Remove max_records (or --set source.structured ...) to ingest all 5942.
+      max_records: 300
+
+vector_store:
+  type: chroma
+  collection: rag_lab_diseases
+  reset_on_ingest: true
+  metric: cosine
+
+embedding:
+  provider: sentence-transformers
+  model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  normalize: true
+
+chunking:
+  strategy: paragraph
+  chunk_size: 360
+  chunk_overlap: 80
+  # L0 lesson: structured records get split, separating the disease name from
+  # its symptom/treatment chunks. Repeating the title in every chunk fixes it
+  # (benzene-poisoning query went from "not in top-5" to rank 1).
+  prepend_title: true
+
+retrieval:
+  candidate_k: 12
+  top_k: 5
+  hybrid: true
+  vector_weight: 0.7
+  bm25_weight: 0.3
+  rrf_k: 60
+
+rerank:
+  mode: cross_encoder
+  model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+  top_k: 5
+  weight: 0.45
+
+display:
+  snippet_chars: 220
