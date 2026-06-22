@@ -10,6 +10,7 @@ __pycache__/
 storage/chroma/
 storage/chunks*.jsonl
 storage/milvus/
+storage/_*
 infra/milvus/volumes/
 
 # User-provided documents can be large or private.

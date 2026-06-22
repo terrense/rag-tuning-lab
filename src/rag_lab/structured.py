@@ -126,7 +126,11 @@ def load_structured_sources(
     cfg: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Load every entry in ``source.structured`` (a list of dataset specs)."""
-    specs = cfg.get("source", {}).get("structured", []) or []
+    source_cfg = cfg.get("source", {})
+    specs = source_cfg.get("structured", []) or []
+    # Global override usable via --set source.structured_max_records=N.
+    # Not set -> use each spec's own max_records. <=0 -> no limit (all records).
+    global_max = source_cfg.get("structured_max_records")
     docs: list[dict[str, Any]] = []
     counts = {"structured_files": 0, "structured_records": 0}
 
@@ -142,7 +146,11 @@ def load_structured_sources(
             )
         if not Path(path).exists():
             raise FileNotFoundError(f"structured source not found: {path}")
-        loaded = loader(path, max_records=spec.get("max_records"))
+        if global_max is not None:
+            max_records = None if int(global_max) <= 0 else int(global_max)
+        else:
+            max_records = spec.get("max_records")
+        loaded = loader(path, max_records=max_records)
         docs.extend(loaded)
         counts["structured_files"] += 1
         counts["structured_records"] += len(loaded)

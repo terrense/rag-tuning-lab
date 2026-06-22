@@ -2,7 +2,7 @@ project:
   name: rag_tuning_lab_diseases
 
 paths:
-  eval_queries: data/eval_queries.yaml
+  eval_queries: data/eval_queries_diseases.yaml
   chunks_cache: storage/chunks_diseases.jsonl
   chroma_dir: storage/chroma
 

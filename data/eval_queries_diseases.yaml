@@ -1,0 +1,45 @@
+# Disease-corpus eval set (L0). Each question maps to exactly one disease record
+# in diseases_clean.json. expected_source_ids use the verbalized doc ids
+# (disease_<index>). Requires a FULL ingest — several ids are beyond the 300-row
+# fast-iteration cap. Mix of name-bearing and symptom-led questions on purpose.
+queries:
+  - id: d_benzene
+    question: "长期吸入苯蒸气会不会中毒？会有哪些症状，需要做什么检查？"
+    expected_source_ids: ["disease_00000"]
+    note: "苯中毒；属性块曾因切块丢失病名 → prepend_title 修复的样例。"
+  - id: d_diabetes
+    question: "经常口渴、多饮多尿、乏力，血糖升高，可能是什么病？怎么治疗？"
+    expected_source_ids: ["disease_04600"]
+    note: "糖尿病；症状导向，无病名。"
+  - id: d_appendicitis
+    question: "突然右下腹剧烈腹痛伴恶心呕吐，是不是急性阑尾炎？该挂哪个科？"
+    expected_source_ids: ["disease_00286"]
+    note: "急性阑尾炎。"
+  - id: d_hypertension
+    question: "血压高、头晕目眩、乏力、后脑有重压感，应该看哪个科，怎么处理？"
+    expected_source_ids: ["disease_00103"]
+    note: "高血压；症状导向。"
+  - id: d_tb
+    question: "长期低热、咳嗽、咯血、消瘦，会不会是肺结核？挂什么科？"
+    expected_source_ids: ["disease_01771"]
+    note: "肺结核。"
+  - id: d_gout
+    question: "大脚趾关节夜里突然剧痛红肿，化验尿酸偏高，是痛风吗？看哪个科？"
+    expected_source_ids: ["disease_00720"]
+    note: "痛风。"
+  - id: d_asthma
+    question: "反复发作的喘息、气促、双肺哮鸣音，是哮喘吗？怎么查？"
+    expected_source_ids: ["disease_00060"]
+    note: "哮喘。"
+  - id: d_shingles
+    question: "身上沿着一条带子长出成簇水疱，伴明显神经痛，是什么病？"
+    expected_source_ids: ["disease_01759"]
+    note: "带状疱疹；症状导向。"
+  - id: d_hyperthyroid
+    question: "怕热、多汗、心慌、消瘦、突眼、甲状腺肿大，是甲亢吗？挂哪个科？"
+    expected_source_ids: ["disease_00117"]
+    note: "甲亢。"
+  - id: d_gastric_ulcer
+    question: "餐后上腹烧灼样疼痛、嗳气，胃镜怀疑溃疡，是胃溃疡吗？怎么治？"
+    expected_source_ids: ["disease_05679"]
+    note: "胃溃疡。"

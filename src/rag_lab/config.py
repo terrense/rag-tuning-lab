@@ -56,6 +56,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "model": "",
     },
     "display": {"snippet_chars": 220},
+    "generation": {
+        "model": "",  # falls back to MINIMAX_MODEL env (MiniMax-M3)
+        "temperature": 0.2,
+        "max_tokens": 2048,
+        "context_chars": 600,
+        "timeout": 60,
+    },
 }
 
 
