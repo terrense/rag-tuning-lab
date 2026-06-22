@@ -1,60 +1,75 @@
+# ============================================================================
+# 疾病数据集实验配置
+# ----------------------------------------------------------------------------
+# 这个文件是“实验的旋钮面板”。代码不用改，改这里的参数 + 重新 ingest/query，
+# 就能做对照实验。命令行还能用 --set 临时覆盖任意一项，例如：
+#   --set retrieval.candidate_k=100
+# ============================================================================
+
 project:
-  name: rag_tuning_lab_diseases
+  name: rag_tuning_lab_diseases   # 项目名，仅用于显示/区分
 
+# --- 路径：各类文件放在哪 -----------------------------------------------------
 paths:
-  eval_queries: data/eval_queries_diseases.yaml
-  chunks_cache: storage/chunks_diseases.jsonl
-  chroma_dir: storage/chroma
+  eval_queries: data/eval_queries_diseases.yaml   # 评测题库（问题 + 标准答案 id）
+  chunks_cache: storage/chunks_diseases.jsonl     # ingest 时把切好的 chunk 存这；query 时直接读，省得重切
+  chroma_dir: storage/chroma                      # Chroma 向量库的落盘目录
 
+# --- 资料来源：用哪些语料建库 -------------------------------------------------
 source:
-  # Pure structured corpus: no interview cards, no docs dir.
-  include_interview_cards: false
-  include_docs_dir: false
-  structured:
-    - format: disease_json
-      path: data/files/数据集/diseases_clean.json
-      # First runs cap the record count for fast iteration.
-      # Remove max_records (or --set source.structured ...) to ingest all 5942.
-      max_records: 300
+  include_interview_cards: false   # 关掉内置 RAG 面试卡片
+  include_docs_dir: false          # 关掉 data/docs 文档目录
+  structured:                      # 结构化数据源（可以配多个）
+    - format: disease_json                         # 用 structured.py 里的 disease_json 加载器
+      path: data/files/数据集/diseases_clean.json   # 原始数据：5942 条疾病记录
+      max_records: 300             # ⚠️ 只取前 300 条（建库快，方便练手）。
+                                   #    全量请加 --set source.structured_max_records=0
 
+# --- 向量库 -----------------------------------------------------------------
 vector_store:
-  type: chroma
-  collection: rag_lab_diseases
-  reset_on_ingest: true
-  metric: cosine
+  type: chroma                 # 用 Chroma（另一个选项是 milvus）
+  collection: rag_lab_diseases # 集合名（相当于数据库里的“表名”）
+  reset_on_ingest: true        # 每次 ingest 先清空重建，避免残留旧数据
+  metric: cosine               # 向量相似度用余弦距离
 
+# --- 把文字变成向量的模型 -----------------------------------------------------
 embedding:
   provider: sentence-transformers
+  # 多语言 MiniLM。注意：实验显示它对中文医疗文本偏弱（vector-only Recall@5 仅 ~0.20），
+  # 是未来可以升级的点（比如换成中文专用的 bge-zh 系列）。
   model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-  normalize: true
+  normalize: true              # 向量归一化（配合 cosine 用）
 
+# --- 切块：把长文档切成小块 chunk ----------------------  👈 最值得调的一组 ----
 chunking:
-  strategy: paragraph
-  chunk_size: 360
-  chunk_overlap: 80
-  # L0 lesson: structured records get split, separating the disease name from
-  # its symptom/treatment chunks. Repeating the title in every chunk fixes it
-  # (benzene-poisoning query went from "not in top-5" to rank 1).
+  strategy: paragraph          # 按段落切（另一个选项是 fixed 定长切）
+  chunk_size: 360              # 每块目标长度 ~360 字。太大→噪声多；太小→上下文断裂
+  chunk_overlap: 80            # 相邻块重叠 80 字，防止答案正好被切在边界上
+  # L0 的第一课：结构化记录被切块后，病名会和“症状/治疗”块分离。
+  # prepend_title=true 让每个块开头都重复病名，召回大幅改善
+  #（“苯中毒”查询从“前 5 没有”→“第 1”）。
   prepend_title: true
 
+# --- 检索：怎么把正确文档捞出来 ------------------------  👈 调参主战场 ---------
 retrieval:
-  # Tuned on the disease eval set (see experiments/LEADERBOARD.md):
-  # candidate_k 12->50 lifted Recall@5 0.30->0.60; bm25-heavy weights (BM25 is
-  # the stronger channel on this Chinese medical corpus) lifted it to 0.70.
-  candidate_k: 50
-  top_k: 5
-  hybrid: true
-  vector_weight: 0.4
-  bm25_weight: 0.6
-  rrf_k: 60
+  # 以下默认值是在疾病评测集上调出来的（见 experiments/LEADERBOARD.md）：
+  #   candidate_k 12→50：Recall@5 0.30→0.60（池子太小，正确文档没进池就被截断）
+  #   bm25 加重 0.3→0.6：Recall@5 0.60→0.70（中文医疗库里 BM25 比向量强）
+  candidate_k: 50    # 每一路（向量/BM25）粗筛多少个候选给后面
+  top_k: 5           # 最终返回几条
+  hybrid: true       # 开启“向量 + BM25”双路混合检索
+  vector_weight: 0.4 # 融合时向量这一路的权重
+  bm25_weight: 0.6   # 融合时 BM25 这一路的权重（这里 BM25 更强，给得更高）
+  rrf_k: 60          # RRF 融合的平滑常数，越大越削弱头部排名的优势
 
+# --- 精排：用更贵的模型把候选重新排 ------------------------------------------
 rerank:
-  mode: cross_encoder
-  model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
-  top_k: 5
-  weight: 0.45
-  # Rerank only the top 20 of the 50-candidate pool to cap cross-encoder latency.
-  input_k: 20
+  mode: cross_encoder                                  # 精排方式：cross-encoder（最准）
+  model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1    # 多语言 cross-encoder 模型
+  top_k: 5                                             # 精排后保留几条
+  weight: 0.45        # 最终分 = (1-0.45)×粗筛分 + 0.45×精排分，越大越信任精排
+  input_k: 20         # 只对候选池“前 20 个”做精排，控制 cross-encoder 的延迟
 
+# --- 显示 -------------------------------------------------------------------
 display:
-  snippet_chars: 220
+  snippet_chars: 220  # 打印结果时，每条正文摘要显示多少字
