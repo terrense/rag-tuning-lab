@@ -73,8 +73,17 @@ def build_context(hits: list[SearchHit], max_chars: int = 600) -> tuple[str, lis
     return "\n\n".join(blocks), sources
 
 
-def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> dict[str, Any]:
-    """给定问题 + 检索到的块，调 MiniMax M3 生成带引用的答案。"""
+def call_minimax(
+    cfg: dict[str, Any],
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> dict[str, Any]:
+    """通用的 MiniMax M3 调用：给一组 messages，返回 {text(已剥思考), usage, model}。
+
+    生成答案(generate_answer)和查询改写(query_rewrite)都复用它，避免重复写 HTTP/鉴权。
+    """
     _load_dotenv()                                      # 先把 .env 里的 key 读进环境变量
     gen_cfg = cfg.get("generation", {})
     api_key = os.environ.get("MINIMAX_API_KEY", "")
@@ -85,14 +94,6 @@ def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> d
             "MINIMAX_API_KEY not set. Put it in .env (gitignored) as MINIMAX_API_KEY=..."
         )
 
-    # 拼 user 提示：问题 + 资料区块
-    context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
-    user_prompt = (
-        f"问题：{query}\n\n"
-        f"【资料】\n{context}\n\n"
-        "请只依据以上资料回答，并在关键结论后标注引用编号。"
-    )
-
     try:
         import requests
     except ImportError as exc:  # pragma: no cover
@@ -101,15 +102,11 @@ def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> d
     # 组装 OpenAI 兼容的请求体
     payload = {
         "model": model,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": float(gen_cfg.get("temperature", 0.2)),    # 低温度，答案更稳定
-        # max_tokens 要够大：既要装下 <think> 思考，又要装下最终答案，否则会被截断
-        "max_tokens": int(gen_cfg.get("max_tokens", 2048)),
+        "messages": messages,
+        "temperature": float(gen_cfg.get("temperature", 0.2)) if temperature is None else temperature,
+        # max_tokens 要够大：既要装下 <think> 思考，又要装下最终输出，否则会被截断
+        "max_tokens": int(gen_cfg.get("max_tokens", 2048)) if max_tokens is None else max_tokens,
     }
-    # 发请求（Bearer 鉴权）
     resp = requests.post(
         f"{base_url}/chat/completions",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -119,5 +116,22 @@ def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> d
     resp.raise_for_status()                              # 非 2xx 直接抛错
     data = resp.json()
     raw = data["choices"][0]["message"]["content"]
-    answer = _strip_think(raw)                           # 剥掉思考块，只留答案
-    return {"answer": answer, "sources": sources, "model": model, "raw_usage": data.get("usage")}
+    return {"text": _strip_think(raw), "usage": data.get("usage"), "model": model}
+
+
+def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> dict[str, Any]:
+    """给定问题 + 检索到的块，调 MiniMax M3 生成带引用的答案。"""
+    gen_cfg = cfg.get("generation", {})
+    # 拼 user 提示：问题 + 资料区块
+    context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
+    user_prompt = (
+        f"问题：{query}\n\n"
+        f"【资料】\n{context}\n\n"
+        "请只依据以上资料回答，并在关键结论后标注引用编号。"
+    )
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
+    out = call_minimax(cfg, messages)                   # ★ 调模型
+    return {"answer": out["text"], "sources": sources, "model": out["model"], "raw_usage": out["usage"]}

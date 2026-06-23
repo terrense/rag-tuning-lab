@@ -23,6 +23,9 @@ def main() -> None:
     parser.add_argument("--query", default="")
     parser.add_argument("--query-id", default="")
     parser.add_argument("--set", action="append", default=[])
+    # 多轮对话历史（可多次），配合 --set query.llm=rewrite 消解“它/这个病”等指代
+    parser.add_argument("--history", action="append", default=[],
+                        help="prior turn text; repeat for multiple turns")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -38,7 +41,7 @@ def main() -> None:
     if not query:
         raise SystemExit("Pass --query or --query-id.")
 
-    result = query_config(cfg, query)                  # 第一步：检索
+    result = query_config(cfg, query, history=args.history or None)  # 第一步：检索（含改写）
     gen = generate_answer(cfg, query, result["hits"])  # 第二步：基于命中生成答案
 
     # 打印答案 + 引用来源 + 用量

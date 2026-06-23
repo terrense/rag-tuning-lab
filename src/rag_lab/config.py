@@ -49,6 +49,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "ngram_max": 4,
         "normalize": True,
     },
+    "query": {                                       # 检索前的三层 query 改写（默认全关）
+        "rules": False,   # 第1层 规则：口语→术语 同义词补全
+        "nlp": False,     # 第2层 传统NLP：分词去停用词（整理 BM25 查询）
+        "llm": "none",    # 第3层 大模型：none | rewrite | hyde | multi
+        "num_variants": 3,        # multi 模式生成几个变体
+        "hyde_max_tokens": 256,   # hyde 假设答案的最大长度
+    },
     "chunking": {                                    # 切块
         "strategy": "paragraph",
         "chunk_size": 360,

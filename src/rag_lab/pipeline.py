@@ -85,37 +85,59 @@ def ingest_config(cfg: dict[str, Any]) -> dict[str, Any]:
 # ============================================================================
 # 动作二：查询 (query)
 # ============================================================================
-def query_config(cfg: dict[str, Any], query: str) -> dict[str, Any]:
-    """一个问题走完整条检索链路，返回最终命中 + 各阶段中间结果。"""
+def query_config(cfg: dict[str, Any], query: str, history: list[str] | None = None) -> dict[str, Any]:
+    """一个问题走完整条检索链路，返回最终命中 + 各阶段中间结果。
+
+    history：多轮对话历史（可选）。开启大模型改写时用于消解“它/这个病”等指代。
+    """
     # 0) 确认建库时存的 chunk 缓存在；不在说明还没 ingest
     chunks_path = get_path(cfg, "chunks_cache")
     if not Path(chunks_path).exists():
         raise FileNotFoundError(f"Chunks cache not found: {chunks_path}. Run ingest first.")
     # 1) 取出（缓存的）chunk、id索引、BM25索引
     chunks, chunk_lookup, bm25_index = _get_retrieval_assets(chunks_path)
-    # 2) 把“问题”也变成向量（和建库用同一个模型）
     embedder = get_embedder(cfg)
-    query_embedding = embedder.embed([query])[0]
-    # 3) 打开向量库（reset=False，只读不重建）
-    store = get_store(cfg, dimension=len(query_embedding), reset=False)
 
     retrieval_cfg = cfg["retrieval"]
     candidate_k = int(retrieval_cfg.get("candidate_k", 12))   # 每路粗筛多少候选
-    # 4) 两路并行粗筛：向量检索 + BM25 关键词检索，各取 candidate_k 个
-    vector_hits = store.search(query_embedding, top_k=candidate_k)
-    bm25_hits = bm25_index.search(query, top_k=candidate_k)
-    # 5) 融合：开了 hybrid 就用 RRF 把两路合成一个排名；否则只用向量这一路
+
+    # 2) ★ 检索前的三层 query 改写：得到若干 (向量文本, BM25文本)。
+    #    不开任何改写时就是 [(原问题, 原问题)]，行为和以前完全一致。
+    from rag_lab.query_rewrite import build_retrieval_queries
+    specs = build_retrieval_queries(cfg, query, history=history)
+
+    # 3) 对每个 spec 各跑一遍向量 + BM25 粗筛（multi 模式会有多个 spec）
+    store = None
+    vector_lists: list[list[SearchHit]] = []
+    bm25_lists: list[list[SearchHit]] = []
+    for vec_text, bm25_text in specs:
+        qe = embedder.embed([vec_text])[0]
+        if store is None:                                     # 用第一个向量的维度打开库（只读）
+            store = get_store(cfg, dimension=len(qe), reset=False)
+        vector_lists.append(store.search(qe, top_k=candidate_k))
+        bm25_lists.append(bm25_index.search(bm25_text, top_k=candidate_k))
+    # 第一个 spec 的两路结果作为“代表”返回（评测/调试看），多 spec 时它是原问题那路
+    vector_hits = vector_lists[0]
+    bm25_hits = bm25_lists[0]
+
+    # 4) 融合：开了 hybrid 就用 RRF 把所有路（可能多个 spec）合成一个排名；否则只用向量
     if bool(retrieval_cfg.get("hybrid", True)):
         candidates = combine_hits(
-            vector_hits=vector_hits,
-            bm25_hits=bm25_hits,
+            vector_lists=vector_lists,
+            bm25_lists=bm25_lists,
             chunk_lookup=chunk_lookup,
             vector_weight=float(retrieval_cfg.get("vector_weight", 0.7)),
             bm25_weight=float(retrieval_cfg.get("bm25_weight", 0.3)),
             rrf_k=float(retrieval_cfg.get("rrf_k", 60)),
         )
     else:
-        candidates = copy.deepcopy(vector_hits)
+        # 仅向量：把所有向量路去重（同 id 留最高分）
+        dedup: dict[str, SearchHit] = {}
+        for vh in vector_lists:
+            for hit in vh:
+                if hit.id not in dedup or hit.score > dedup[hit.id].score:
+                    dedup[hit.id] = copy.deepcopy(hit)
+        candidates = list(dedup.values())
 
     top_k = int(retrieval_cfg.get("top_k", 5))                 # 最终返回几条
     # 6) 按融合分排序，截取候选池（最多 candidate_k 个）
@@ -152,14 +174,16 @@ def query_config(cfg: dict[str, Any], query: str) -> dict[str, Any]:
 # 两路都靠前的文档，融合分自然最高。
 # ============================================================================
 def combine_hits(
-    vector_hits: list[SearchHit],
-    bm25_hits: list[SearchHit],
+    vector_lists: list[list[SearchHit]],
+    bm25_lists: list[list[SearchHit]],
     chunk_lookup: dict[str, Chunk],
     vector_weight: float,
     bm25_weight: float,
     rrf_k: float,
 ) -> list[SearchHit]:
-    combined: dict[str, SearchHit] = {}   # 按 chunk id 去重合并：同一个 chunk 两路都命中只算一条
+    """RRF 融合。支持多路：multi-query 改写时会有多个向量/BM25 结果列表，
+    每个列表的排名都按 RRF 公式累加到同一个 chunk 上。"""
+    combined: dict[str, SearchHit] = {}   # 按 chunk id 去重合并：同一个 chunk 多路命中只算一条
 
     def add(hit: SearchHit, channel: str, rank: int, weight: float) -> None:
         """把某一路的一个命中累加进 combined。channel 是 'vector' 或 'bm25'。"""
@@ -183,12 +207,14 @@ def combine_hits(
             target.bm25_score = hit.bm25_score if hit.bm25_score is not None else hit.score
             target.rank_details["bm25_rank"] = rank
 
-    # 遍历两路，rank 从 1 开始（第 1 名 rank=1）
-    for rank, hit in enumerate(vector_hits, start=1):
-        add(hit, "vector", rank, vector_weight)
-    for rank, hit in enumerate(bm25_hits, start=1):
-        add(hit, "bm25", rank, bm25_weight)
-    return list(combined.values())   # 注意：这里没排序，排序在 query_config 第 6 步做
+    # 遍历每一路（可能多个 spec 的多个列表），rank 从 1 开始（第 1 名 rank=1）
+    for vector_hits in vector_lists:
+        for rank, hit in enumerate(vector_hits, start=1):
+            add(hit, "vector", rank, vector_weight)
+    for bm25_hits in bm25_lists:
+        for rank, hit in enumerate(bm25_hits, start=1):
+            add(hit, "bm25", rank, bm25_weight)
+    return list(combined.values())   # 注意：这里没排序，排序在 query_config 后面做
 
 
 # ============================================================================
