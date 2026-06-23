@@ -11,6 +11,8 @@ storage/chroma/
 storage/chunks*.jsonl
 storage/milvus/
 storage/_*
+storage/figures/
+storage/figure_captions.json
 infra/milvus/volumes/
 
 # User-provided documents can be large or private.

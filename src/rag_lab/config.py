@@ -34,6 +34,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "include_docs_dir": True,
         # L0 结构化数据集：列表，每项是 {format, path, max_records?}
         "structured": [],
+        # 开启后 docs_dir 里的 PDF 走多模态导入（文字+表格+配图），而非纯文本
+        "pdf_multimodal": False,
+    },
+    "multimodal": {                                  # 多模态 PDF 导入参数（L2~L5）
+        "tables": True,           # 抽表格
+        "figures": True,          # 抽配图（渲染整页）
+        "caption": True,          # 用 M3 视觉给图配描述
+        "max_figures_per_doc": 8, # 每篇最多 caption 几页图
+        "max_figures_total": 60,  # 全局 caption 上限（控成本，可 --set 调高）
+        "render_zoom": 2.0,       # 渲染清晰度
+        "max_image_px": 1400,     # 渲染后长边上限（控 base64 体积）
+        "min_table_rows": 2,      # 少于这么多行的“表”忽略
     },
     "vector_store": {                                # 向量库
         "type": "chroma",

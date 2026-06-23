@@ -1,0 +1,69 @@
+# ============================================================================
+# 通用多模态文档 RAG 配置（话题无关：论文/政策/技术书……）
+# 把 data/files 下的 PDF 做 文字 + 表格 + 配图(M3视觉描述) 三模态导入。
+# 与医疗的 diseases.yaml 并存、互不干扰（不同 collection / chunks 缓存）。
+# ============================================================================
+
+project:
+  name: rag_tuning_lab_docs
+
+paths:
+  docs_dir: data/files            # ★ 你放 PDF 的目录
+  eval_queries: data/eval_queries_docs.yaml
+  chunks_cache: storage/chunks_docs.jsonl
+  chroma_dir: storage/chroma
+
+source:
+  include_interview_cards: false
+  include_docs_dir: true          # 从 docs_dir 读文件
+  pdf_multimodal: true            # ★ PDF 走多模态导入
+
+multimodal:
+  tables: true            # 抽表格 → Markdown
+  figures: true           # 抽配图（渲染图最多的页）
+  caption: true           # 用 MiniMax M3 视觉给图写描述
+  max_figures_per_doc: 8  # 每篇最多 caption 几页图
+  max_figures_total: 60   # 全局上限（控成本/时间；--set multimodal.max_figures_total=N 调高）
+  render_zoom: 2.0
+  max_image_px: 1400
+  min_table_rows: 2
+
+vector_store:
+  type: chroma
+  collection: rag_lab_docs       # 和医疗库分开
+  reset_on_ingest: true
+  metric: cosine
+
+embedding:
+  provider: sentence-transformers
+  model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  normalize: true
+
+chunking:
+  strategy: paragraph
+  chunk_size: 360
+  chunk_overlap: 80
+  prepend_title: true     # 每个块带上“文档名 p.X”，跨文档检索时不丢出处
+
+retrieval:
+  candidate_k: 50
+  top_k: 5
+  hybrid: true
+  vector_weight: 0.5      # 通用文档里语义更重要，给向量略高（医疗库才是 BM25 偏高）
+  bm25_weight: 0.5
+  rrf_k: 60
+
+rerank:
+  mode: cross_encoder
+  model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+  top_k: 5
+  weight: 0.45
+  input_k: 20
+
+query:
+  rules: false
+  nlp: false
+  llm: none
+
+display:
+  snippet_chars: 220

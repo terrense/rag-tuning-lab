@@ -1,0 +1,3 @@
+# 通用多模态文档评测题（建完库后再补 expected_source_ids）
+# 暂为空，先把多模态 ingest 跑通；之后据实际文档/图表内容补题。
+queries: []

@@ -58,9 +58,17 @@ def load_corpus(cfg: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, in
     # 2) data/docs/ 下的用户文档（pdf/txt/md）
     if bool(source_cfg.get("include_docs_dir", True)):
         docs_dir = Path(cfg["paths"].get("docs_dir", "data/docs"))
-        file_docs, file_counts = load_document_files(docs_dir)
+        multimodal = bool(source_cfg.get("pdf_multimodal", False))
+        # 多模态模式下，PDF 交给 multimodal.py（文字+表格+配图），txt/md 仍走普通加载
+        file_docs, file_counts = load_document_files(docs_dir, skip_pdf=multimodal)
         docs.extend(file_docs)
         counts.update(file_counts)
+        if multimodal:
+            from rag_lab.multimodal import load_multimodal_corpus
+
+            mm_docs, mm_counts = load_multimodal_corpus(cfg)
+            docs.extend(mm_docs)
+            counts.update(mm_counts)
 
     # 3) 结构化数据集（疾病 JSON 等），交给 structured.py
     if source_cfg.get("structured"):
@@ -73,8 +81,11 @@ def load_corpus(cfg: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, in
     return docs, counts
 
 
-def load_document_files(docs_dir: str | Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """扫描 docs_dir，把支持的文件都加载成文档。PDF 按“页”拆成多个文档。"""
+def load_document_files(docs_dir: str | Path, skip_pdf: bool = False) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """扫描 docs_dir，把支持的文件都加载成文档。PDF 按“页”拆成多个文档。
+
+    skip_pdf=True 时跳过 PDF（多模态模式下 PDF 由 multimodal.py 处理）。
+    """
     docs_dir = Path(docs_dir)
     counts = {"files": 0, "pdf_pages": 0}
     if not docs_dir.exists():
@@ -90,6 +101,8 @@ def load_document_files(docs_dir: str | Path) -> tuple[list[dict[str, Any]], dic
         if path.name.upper() == "README.MD":         # 跳过说明文件
             continue
         if path.suffix.lower() == ".pdf":
+            if skip_pdf:
+                continue
             pdf_docs = _load_pdf(path, docs_dir)      # PDF：一页一个文档
             docs.extend(pdf_docs)
             counts["files"] += 1
