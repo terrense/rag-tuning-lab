@@ -51,6 +51,10 @@ def main() -> None:
     print("\n引用来源：")
     for s in gen["sources"]:
         print(f"  [{s['n']}] {s['title']}  ({s['source_id']})")
+    if gen.get("images_used"):                         # 这次回答看了哪些真实配图
+        print("\n看图（喂给 M3 的配图）：")
+        for p in gen["images_used"]:
+            print(f"  - {p}")
     if gen.get("raw_usage"):
         print(f"\n(model={gen['model']}, usage={gen['raw_usage']})")
 

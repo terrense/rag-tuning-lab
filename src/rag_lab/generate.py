@@ -119,19 +119,58 @@ def call_minimax(
     return {"text": _strip_think(raw), "usage": data.get("usage"), "model": model}
 
 
+def _figure_images(hits: list[SearchHit], limit: int) -> list[str]:
+    """从命中里挑出“配图”块对应的真实图片路径（去重、限量、确认文件存在）。"""
+    import os
+    paths: list[str] = []
+    for hit in hits:
+        if hit.metadata.get("modality") == "figure":
+            p = hit.metadata.get("image_path")
+            if p and p not in paths and os.path.exists(p):
+                paths.append(p)
+        if len(paths) >= limit:
+            break
+    return paths
+
+
 def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> dict[str, Any]:
-    """给定问题 + 检索到的块，调 MiniMax M3 生成带引用的答案。"""
+    """给定问题 + 检索到的块，调 MiniMax M3 生成带引用的答案。
+
+    若命中里有“配图”块，则把真实图片一并喂给 M3（图文联合回答 / 真·多模态）。
+    """
     gen_cfg = cfg.get("generation", {})
     # 拼 user 提示：问题 + 资料区块
     context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
     user_prompt = (
         f"问题：{query}\n\n"
         f"【资料】\n{context}\n\n"
-        "请只依据以上资料回答，并在关键结论后标注引用编号。"
+        "请只依据以上资料（含图片）回答，并在关键结论后标注引用编号。"
     )
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt},
-    ]
-    out = call_minimax(cfg, messages)                   # ★ 调模型
-    return {"answer": out["text"], "sources": sources, "model": out["model"], "raw_usage": out["usage"]}
+
+    # 收集命中的配图图片（可开关、限量）
+    images: list[str] = []
+    if bool(gen_cfg.get("use_figure_images", True)):
+        images = _figure_images(hits, int(gen_cfg.get("max_figure_images", 3)))
+
+    if images:
+        # 多模态消息：文字 + 若干图片
+        import base64
+        content: list[dict] = [{"type": "text", "text": user_prompt}]
+        for p in images:
+            data = base64.b64encode(open(p, "rb").read()).decode("ascii")
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{data}"}})
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": content}]
+        try:
+            out = call_minimax(cfg, messages)
+        except Exception:
+            # 图片让请求失败（如尺寸不被接受）就退回纯文字
+            messages = [{"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt}]
+            out = call_minimax(cfg, messages)
+            images = []
+    else:
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_prompt}]
+        out = call_minimax(cfg, messages)
+
+    return {"answer": out["text"], "sources": sources, "model": out["model"],
+            "raw_usage": out["usage"], "images_used": images}

@@ -96,6 +96,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "max_tokens": 2048,
         "context_chars": 600,
         "timeout": 60,
+        "use_figure_images": True,   # 命中配图时把真实图片喂回 M3（图文联合回答）
+        "max_figure_images": 3,      # 最多附几张图
     },
 }
 
