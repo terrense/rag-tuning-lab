@@ -126,9 +126,24 @@ def search_caption(cfg: dict, query: str, k: int = 5):
     return [(float(sims[i]), meta[i]) for i in idx]
 
 
-# --- 对比评测：一组"找某篇论文配图"的问题 ----------------------------------
-# expected 用论文文件名的关键片段；命中=top-k 里有该论文的图
-EVAL = [
+# --- 融合：把 A(描述) 和 B(CLIP) 两路用 RRF 合成一个排名（#3 混合召回）------
+def search_fused(cfg: dict, query: str, k: int = 5, rrf_k: float = 60.0):
+    """A+B 融合：两路各取候选，按 RRF（只看排名）合并，返回 top-k 图。"""
+    a = search_caption(cfg, query, k * 2)
+    b = search_clip(cfg, query, k * 2)
+    scores: dict[str, float] = {}
+    metas: dict[str, dict] = {}
+    for rank, (_s, m) in enumerate(a, 1):
+        key = m["image_path"]; scores[key] = scores.get(key, 0.0) + 1.0 / (rrf_k + rank); metas[key] = m
+    for rank, (_s, m) in enumerate(b, 1):
+        key = m["image_path"]; scores[key] = scores.get(key, 0.0) + 1.0 / (rrf_k + rank); metas[key] = m
+    ranked = sorted(scores, key=lambda x: scores[x], reverse=True)[:k]
+    return [(scores[x], metas[x]) for x in ranked]
+
+
+# --- 两组评测：①方法名类（偏文本，favours A） ②纯视觉外观类（favours B）------
+# 每题 (问题, 预期论文文件名关键片段)
+EVAL_METHOD = [   # 点名方法/技术（文本线索强）
     ("图神经网络的四种架构示意图（卷积、循环、自编码、时空）", "Graph Neural networks"),
     ("skeleton 骨架动作识别的时空图网络结构图", "skeleton-based Action"),
     ("CLIP 多模态提示学习 MaPLe 的方法框架图", "MaPLe"),
@@ -136,22 +151,37 @@ EVAL = [
     ("视频文本自适应 CLIP 的多模态提示结构", "Vita-CLIP"),
     ("语音医疗助手的系统框架图", "SpeechMedAssist"),
 ]
+EVAL_VISUAL = [   # 只描述"长什么样"，不点名方法（视觉线索强，给 CLIP 机会）
+    ("一张人体骨架关键点用线连接的姿态示意图", "skeleton-based Action"),
+    ("彩色的三维点云场景分割图", "CLIP2Scene"),
+    ("多个并排的神经网络结构流程框图对比", "Graph Neural networks"),
+    ("展示人脸表情用于情绪识别的图片", "Decoupled Multimodal"),
+]
+
+
+def _hit(results, expect: str) -> bool:
+    return any(expect.lower() in m["file_name"].lower() for _, m in results)
+
+
+def _run_compare(cfg: dict, evalset: list, k: int, title: str) -> None:
+    hitA = hitB = hitF = 0
+    print(f"\n### {title}")
+    print(f"{'query':34} | A描述 | B-CLIP | A+B融合")
+    print("-" * 66)
+    for q, expect in evalset:
+        a = _hit(search_caption(cfg, q, k), expect)
+        b = _hit(search_clip(cfg, q, k), expect)
+        f = _hit(search_fused(cfg, q, k), expect)
+        hitA += a; hitB += b; hitF += f
+        print(f"{q[:34]:34} |  {'✓' if a else '✗'}   |   {'✓' if b else '✗'}    |   {'✓' if f else '✗'}")
+    n = len(evalset)
+    print("-" * 66)
+    print(f"hit@{k}:  A={hitA}/{n}={hitA/n:.2f}   B={hitB}/{n}={hitB/n:.2f}   A+B={hitF}/{n}={hitF/n:.2f}")
 
 
 def compare(cfg: dict, k: int = 5) -> None:
-    hitA = hitB = 0
-    print(f"{'query':36} | A描述法 | B-CLIP")
-    print("-" * 64)
-    for q, expect in EVAL:
-        a = search_caption(cfg, q, k)
-        b = search_clip(cfg, q, k)
-        a_ok = any(expect.lower() in m["file_name"].lower() for _, m in a)
-        b_ok = any(expect.lower() in m["file_name"].lower() for _, m in b)
-        hitA += a_ok; hitB += b_ok
-        print(f"{q[:36]:36} |   {'✓' if a_ok else '✗'}    |   {'✓' if b_ok else '✗'}")
-    n = len(EVAL)
-    print("-" * 64)
-    print(f"hit@{k}：  架构A(描述法) {hitA}/{n} = {hitA/n:.2f}    架构B(CLIP) {hitB}/{n} = {hitB/n:.2f}")
+    _run_compare(cfg, EVAL_METHOD, k, "方法名类查询（偏文本线索）")
+    _run_compare(cfg, EVAL_VISUAL, k, "纯视觉外观类查询（偏视觉线索）")
 
 
 def main() -> None:

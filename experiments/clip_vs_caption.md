@@ -30,18 +30,40 @@ from the right paper appears in the top-5.
   Those names are **text printed inside the figure** — the M3 caption reads them,
   but a CLIP visual embedding cannot read in-figure text.
 
-## Honest caveat
-The eval queries mostly *name* the method (a textual cue), which inherently
-favours A. A purely visual query ("a diagram with three boxes joined by arrows")
-would favour B. So the takeaway is not "CLIP is useless":
+## Follow-up: visual queries + A+B fusion
 
+To be fair to CLIP we added a second eval set of *appearance-only* queries (no
+method names) and an A+B RRF-fused method:
+
+| eval set | A caption | B CLIP | A+B fused |
+|---|:---:|:---:|:---:|
+| method-named (6 q) | 6/6 | 2/6 | 6/6 |
+| visual-appearance (4 q) | 4/4 | 1/4 | 4/4 |
+
+**CLIP loses even the visual queries** ("human skeleton keypoints", "3D point
+cloud scene"). Two reasons, and the first is the important one:
+
+1. **We feed CLIP whole-page renders, not cropped figures.** To avoid the
+   image-XObject explosion we render the entire page; a page is mostly text, so
+   CLIP's image embedding describes "an academic-paper page", not "a skeleton
+   diagram" — its visual advantage is diluted away. CLIP needs cropped figure
+   regions to shine.
+2. The multilingual CLIP text tower is a distilled model, weaker than the native
+   English CLIP text encoder.
+
+**A+B fusion = A here** (no gain, because A already saturates the eval) **but
+never worse than A** — RRF means an extra weak channel can't drop A's hits. So
+adding CLIP as an extra recall channel is *safe* but unhelpful on this corpus.
+
+## Takeaways
 > For document / framework figures whose meaning lives in **text and structure**,
-> caption-based retrieval wins decisively. CLIP-style image embeddings suit
-> **natural-image / appearance** search — which this corpus is not.
+> M3-caption retrieval wins decisively — even on visually-phrased queries.
+> CLIP would need **cropped figures** (region detection) and/or an
+> **appearance-heavy corpus** (photos) to contribute. Fusion is harmless.
 
-In the production pipeline we keep A for retrieval and additionally feed the real
-image to M3 at answer time (best of both). CLIP could be added as an extra recall
-channel for appearance-style queries if the corpus grew to include photos.
+Pipeline keeps A for retrieval and feeds the real image to M3 at answer time
+(best of both). Future work to actually help CLIP: detect+crop figure regions
+before embedding.
 
 Reproduce: `python -m rag_lab.clip_index --config configs/docs.yaml --build`
 then `--compare` (or `--query "..."` for a side-by-side).
