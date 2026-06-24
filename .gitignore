@@ -32,3 +32,7 @@ data/files/**/*.xlsx
 
 # Local notebooks/checkpoints
 .ipynb_checkpoints/
+
+# CLIP image index artifacts (lab experiment)
+storage/*.npy
+storage/figures_meta.json
