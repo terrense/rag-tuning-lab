@@ -10,4 +10,5 @@ Pipeline = the configured retrieval stack (hybrid + rerank unless noted).
 | rewrite-3layer | 2026-06-23 08:41 | 3dd30ed | 360/80 | Y | 50 | 0.6 | cross_encoder | 0.700 | 0.575 | 0.719 | 11569 | 10 |
 | cand_k=50 | 2026-06-22 05:59 | e954996 | 360/80 | Y | 50 | 0.3 | cross_encoder | 0.600 | 0.458 | 0.493 | 19283 | 10 |
 | cand_k=100 | 2026-06-22 06:07 | c980993 | 360/80 | Y | 100 | 0.3 | cross_encoder | 0.600 | 0.458 | 0.532 | 32298 | 10 |
+| docs-multimodal-baseline | 2026-06-24 02:55 | 7fe2082 | 360/80 | Y | 50 | 0.5 | cross_encoder | 0.417 | 0.575 | 0.583 | 2617 | 10 |
 | full-baseline | 2026-06-22 05:52 | e954996 | 360/80 | Y | 12 | 0.3 | cross_encoder | 0.300 | 0.300 | 0.300 | 26360 | 10 |

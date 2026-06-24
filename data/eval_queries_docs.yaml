@@ -1,3 +1,70 @@
-# 通用多模态文档评测题（建完库后再补 expected_source_ids）
-# 暂为空，先把多模态 ingest 跑通；之后据实际文档/图表内容补题。
-queries: []
+# 通用多模态文档评测集（10 题，覆盖 配图/表格/文字 三模态）
+# expected_source_ids = 该问题对应论文的相关 chunk id 列表（命中其一即算对，
+# 即“是否召回到正确论文的相关内容”——对多模态文档问答是合适的粒度）。
+queries:
+  - id: doc_gnn_arch
+    question: "图神经网络有哪四种主要架构？各自结构示意图"
+    expected_source_ids:
+      - pdf_a_comprehensive_survey_on_graph_neural_networks_p0002_fig
+      - pdf_a_comprehensive_survey_on_graph_neural_networks_p0005_fig
+      - pdf_a_comprehensive_survey_on_graph_neural_networks_p0007_fig
+    note: figure 命中
+  - id: doc_skeleton
+    question: "基于骨架的动作识别用的是什么网络结构？"
+    expected_source_ids:
+      - pdf_spatial_temporal_graph_attention_network_for_skeleton_based__p0001
+      - pdf_spatial_temporal_graph_attention_network_for_skeleton_based__p0013_fig
+    note: text/figure
+  - id: doc_maple
+    question: "MaPLe 的多模态提示学习方法框架是怎样的？"
+    expected_source_ids:
+      - pdf_maple_multi_modal_prompt_learning_p0002_fig
+      - pdf_maple_multi_modal_prompt_learning_p0003_fig
+      - pdf_maple_multi_modal_prompt_learning_p0001
+    note: figure
+  - id: doc_clip2scene
+    question: "CLIP2Scene 如何把 CLIP 用到 3D 点云场景理解？"
+    expected_source_ids:
+      - pdf_clip2scene_towards_label_efficient_3d_scene_understanding_by_p0001_fig
+      - pdf_clip2scene_towards_label_efficient_3d_scene_understanding_by_p0003_fig
+      - pdf_clip2scene_towards_label_efficient_3d_scene_understanding_by_p0001
+    note: figure
+  - id: doc_vita_table
+    question: "Vita-CLIP 在视频动作识别上的实验结果对比"
+    expected_source_ids:
+      - pdf_vita_clip_video_and_text_adaptive_clip_via_multimodal_prompt_p0002_tbl0
+      - pdf_vita_clip_video_and_text_adaptive_clip_via_multimodal_prompt_p0002_tbl1
+      - pdf_vita_clip_video_and_text_adaptive_clip_via_multimodal_prompt_p0002_fig
+    note: table
+  - id: doc_speechmed_safety
+    question: "语音医疗助手怎么做安全约束？用了什么数据集？"
+    expected_source_ids:
+      - pdf_speechmedassist_p0004_tbl0
+      - pdf_speechmedassist_p0004
+    note: table/text
+  - id: doc_detecting
+    question: "多模态媒体篡改检测的整体框架是什么？"
+    expected_source_ids:
+      - pdf_detecting_and_grounding_multi_modal_media_manipulation_p0001_fig
+      - pdf_detecting_and_grounding_multi_modal_media_manipulation_p0004_fig
+      - pdf_detecting_and_grounding_multi_modal_media_manipulation_p0001
+    note: figure
+  - id: doc_speechmed_authors
+    question: "SpeechMedAssist 这篇论文是做什么的？"
+    expected_source_ids:
+      - pdf_speechmedassist_p0001
+      - pdf_speechmedassist_p0001_fig
+    note: text
+  - id: doc_maple_table
+    question: "MaPLe 的消融实验和基线对比结果"
+    expected_source_ids:
+      - pdf_maple_multi_modal_prompt_learning_p0003_tbl0
+      - pdf_maple_multi_modal_prompt_learning_p0008_tbl0
+    note: table
+  - id: doc_vita_struct
+    question: "Vita-CLIP 怎么对视频和文本做自适应提示？"
+    expected_source_ids:
+      - pdf_vita_clip_video_and_text_adaptive_clip_via_multimodal_prompt_p0002_fig
+      - pdf_vita_clip_video_and_text_adaptive_clip_via_multimodal_prompt_p0004_fig
+      - pdf_vita_clip_video_and_text_adaptive_clip_via_multimodal_prompt_p0001
+    note: figure
