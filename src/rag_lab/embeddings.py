@@ -75,7 +75,10 @@ class SentenceTransformerEmbedder:
         emb_cfg = cfg["embedding"]
         self.model_name = str(emb_cfg["model"])
         self._normalize = bool(emb_cfg.get("normalize", True))
-        self.model = SentenceTransformer(self.model_name)     # ← 这一步从磁盘/网络加载模型，耗时
+        # device=None 让 sentence-transformers 自动选（有 CUDA 就用 GPU）；
+        # 也可在配置里写 embedding.device: cuda / cpu 强制指定。
+        device = emb_cfg.get("device") or None
+        self.model = SentenceTransformer(self.model_name, device=device)     # ← 这一步从磁盘/网络加载模型，耗时
         # 不同版本接口名不一样，兼容一下，拿到向量维度
         if hasattr(self.model, "get_embedding_dimension"):
             dim = self.model.get_embedding_dimension()

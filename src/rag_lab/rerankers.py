@@ -81,8 +81,8 @@ def rerank_hits(query: str, hits: list[SearchHit], cfg: dict) -> list[SearchHit]
 _CE_CACHE: dict = {}
 
 
-def _get_cross_encoder(model_name: str):
-    """拿到（缓存的）CrossEncoder 模型。"""
+def _get_cross_encoder(model_name: str, device: str | None = None):
+    """拿到（缓存的）CrossEncoder 模型。device=None 自动选（有 CUDA 用 GPU）。"""
     if model_name not in _CE_CACHE:
         try:
             from sentence_transformers import CrossEncoder
@@ -90,7 +90,7 @@ def _get_cross_encoder(model_name: str):
             raise RuntimeError(
                 "cross_encoder rerank needs sentence-transformers. Run: pip install -r requirements-transformers.txt"
             ) from exc
-        _CE_CACHE[model_name] = CrossEncoder(model_name)
+        _CE_CACHE[model_name] = CrossEncoder(model_name, device=device)
     return _CE_CACHE[model_name]
 
 
@@ -101,6 +101,6 @@ def _cross_encoder_scores(query: str, hits: list[SearchHit], cfg: dict) -> list[
     pipeline 里要用 rerank.input_k 限制喂进来的候选数量。
     """
     model_name = str(cfg["rerank"].get("model") or "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
-    model = _get_cross_encoder(model_name)
+    model = _get_cross_encoder(model_name, device=cfg["rerank"].get("device") or None)
     pairs = [(query, hit.text) for hit in hits]            # 把问题和每个候选配成对
     return [float(score) for score in model.predict(pairs)]
