@@ -36,3 +36,4 @@ data/files/**/*.xlsx
 # CLIP image index artifacts (lab experiment)
 storage/*.npy
 storage/figures_meta.json
+storage/graph_triples.json
