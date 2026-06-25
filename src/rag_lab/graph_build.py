@@ -107,8 +107,31 @@ def _embedding_merge(names: list[str], cfg: dict, threshold: float = 0.9) -> dic
     return mapping
 
 
+# 只保留"研究内容"类实体；丢掉 机构/人物/其他，以及通用词噪声
+_ALLOWED_TYPES = {"模型", "方法", "任务", "概念", "数据集", "指标", "技术"}
+_STOP_ENTITIES = {"本文", "我们", "已有方法", "现有方法", "该方法", "方法", "模型",
+                  "提出的方法", "本方法", "作者", "论文", "该模型"}
+
+
+def _keep_entity(name: str, etype: str, use_types: bool) -> bool:
+    if name in _STOP_ENTITIES:
+        return False
+    if use_types and etype and etype not in _ALLOWED_TYPES:  # 有类型且不在白名单 → 丢
+        return False
+    return True
+
+
 def build_graph(triples: list[dict], cfg: dict | None = None,
-                embed_dedup: bool = False, threshold: float = 0.9) -> nx.MultiDiGraph:
+                embed_dedup: bool = False, threshold: float = 0.9,
+                type_filter: bool = True) -> nx.MultiDiGraph:
+    # 类型过滤：只要三元组任一端不是"研究内容"类实体，整条丢弃
+    if type_filter:
+        use_types = any("head_type" in t for t in triples)   # 老数据没类型则只用停用词表
+        kept = [t for t in triples
+                if _keep_entity(t["head"], t.get("head_type", ""), use_types)
+                and _keep_entity(t["tail"], t.get("tail_type", ""), use_types)]
+        print(f"  类型过滤：{len(triples)} → {len(kept)} 条三元组")
+        triples = kept
     canon = _build_canonical_map(triples)
     if embed_dedup and cfg is not None:
         # 在字符串消歧之上，再用 embedding 合并语义近义的规范名

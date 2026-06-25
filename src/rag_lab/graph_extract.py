@@ -24,13 +24,14 @@ from rag_lab.generate import call_minimax
 TRIPLES_FILE = Path("storage/graph_triples.json")
 
 _SYS = (
-    "你是知识图谱抽取器。从给定的学术/技术文本中抽取实体之间的关系，"
-    "输出三元组。要求：\n"
-    "1) 实体用规范简洁的名词（方法名、模型、任务、数据集、概念、机构等），"
-    "同一实体不同写法请归一（如 CLIP 与 clip-ViT-B-32 视作 CLIP）。\n"
-    "2) 关系用简短中文动词短语（如 提出、基于、用于、改进、包含、对比、属于）。\n"
-    "3) 只抽文本明确支持的关系，不要臆造。\n"
-    '4) 只输出 JSON 数组，每项 {"head":"", "relation":"", "tail":""}，不要解释。'
+    "你是知识图谱抽取器。从给定的学术/技术文本中抽取实体之间的关系，输出三元组。要求：\n"
+    "1) 实体用规范简洁的名词；同一实体不同写法请归一（如 CLIP 与 clip-ViT-B-32 视作 CLIP）。\n"
+    "2) 给每个实体标注类型(type)，从这些里选："
+    "模型、方法、任务、概念、数据集、指标、技术、机构、人物、其他。\n"
+    "3) 关系用简短中文动词短语（如 提出、基于、用于、改进、包含、对比、属于）。\n"
+    "4) 只抽文本明确支持的关系，不要臆造；不要把'本文/已有方法/我们'这类通用词当实体。\n"
+    '5) 只输出 JSON 数组，每项 '
+    '{"head":"", "head_type":"", "relation":"", "tail":"", "tail_type":""}，不要解释。'
 )
 
 
@@ -48,8 +49,10 @@ def _parse_json_array(text: str) -> list[dict]:
     for d in data:
         if isinstance(d, dict) and d.get("head") and d.get("relation") and d.get("tail"):
             out.append({"head": str(d["head"]).strip(),
+                        "head_type": str(d.get("head_type", "其他")).strip(),
                         "relation": str(d["relation"]).strip(),
-                        "tail": str(d["tail"]).strip()})
+                        "tail": str(d["tail"]).strip(),
+                        "tail_type": str(d.get("tail_type", "其他")).strip()})
     return out
 
 
