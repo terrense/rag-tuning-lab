@@ -61,17 +61,23 @@ def extract_triples(cfg: dict, text: str, max_triples: int = 12) -> list[dict]:
     return _parse_json_array(out["text"])[:max_triples]
 
 
-def build_sample(cfg: dict, keywords: list[str], max_chunks: int) -> dict:
-    """从 docs 的 chunk 缓存里挑选若干文本块（按论文关键词过滤）抽三元组。"""
+def build_sample(cfg: dict, keywords: list[str], per_paper: int) -> dict:
+    """每个关键词（论文）各取 per_paper 个文本块抽三元组，保证跨论文覆盖。"""
     chunks_path = cfg["paths"]["chunks_cache"]
     picked = []
+    counts = {k: 0 for k in keywords}
     for line in open(chunks_path, encoding="utf-8"):
         o = json.loads(line)
         m = o["metadata"]
         sid = m.get("source_id", "") or ""
-        if m.get("modality") == "text" and any(k in sid for k in keywords):
-            picked.append(o)
-        if len(picked) >= max_chunks:
+        if m.get("modality") != "text":
+            continue
+        for k in keywords:                       # 命中哪篇就计入哪篇的配额
+            if k in sid and counts[k] < per_paper:
+                picked.append(o)
+                counts[k] += 1
+                break
+        if all(c >= per_paper for c in counts.values()):
             break
 
     all_triples = []
@@ -98,12 +104,12 @@ def main() -> None:
     p.add_argument("--config", default="configs/docs.yaml")
     p.add_argument("--keywords", default="maple,graph_neural,clip2scene",
                    help="逗号分隔，按 source_id 过滤要抽的论文")
-    p.add_argument("--max-chunks", type=int, default=8)
+    p.add_argument("--per-paper", type=int, default=3, help="每篇论文取几块")
     args = p.parse_args()
     cfg = load_config(args.config)
     kws = [k.strip() for k in args.keywords.split(",") if k.strip()]
-    print(f"抽取范围: {kws}  最多 {args.max_chunks} 块")
-    r = build_sample(cfg, kws, args.max_chunks)
+    print(f"抽取范围: {kws}  每篇 {args.per_paper} 块")
+    r = build_sample(cfg, kws, args.per_paper)
     print(f"\n共 {r['num_triples']} 三元组, {r['num_entities']} 实体, 来自 {r['num_chunks']} 块")
     print("样例三元组：")
     for t in r["triples"][:20]:

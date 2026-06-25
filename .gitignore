@@ -37,3 +37,4 @@ data/files/**/*.xlsx
 storage/*.npy
 storage/figures_meta.json
 storage/graph_triples.json
+storage/graph.json
