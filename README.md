@@ -1,153 +1,118 @@
 # RAG Tuning Lab
 
-这个项目是一个 RAG 调参实验台。它也是一个**干中学**的渐进式项目，目标是把检索能力从纯文本一步步扩展到多模态——详见 [ROADMAP.md](ROADMAP.md)。
+一个**干中学**的渐进式 RAG 实验台：从最朴素的相似度检索，一步步做到**多模态**与
+**GraphRAG**，每个能力都配**可运行 demo**和**可量化的实验追踪**。不是 demo 堆砌，
+而是"改一个变量 → 看指标变化 → 理解它解决了哪类失败"。
 
-你主要用一个配置：
+> 配置驱动（`configs/*.yaml` + `--set a.b=c` 覆盖），离线建库 / 在线查询分离，
+> 实验自动记录到 `experiments/`。LLM 用 **MiniMax M3**，向量库 **Chroma**。
 
-```powershell
-configs/play.yaml
-```
+---
 
-它默认使用：
+## 三种 RAG 范式（本项目都实现了）
 
-- 向量库：Chroma
-- Embedding：`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
-- Reranker：`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`
-- 召回：Vector + BM25 hybrid search
+| 范式 | 擅长的问题 | 实现 | 怎么跑 |
+|---|---|---|---|
+| **① 普通 RAG** | 局部事实问答 | 向量 + BM25 → RRF 融合 → cross-encoder 精排 | `configs/diseases.yaml` |
+| **② 多模态 RAG** | 图 / 表 问答 | 文字 + 表格(Markdown) + 配图(M3视觉描述)；回答时把真实图喂回 M3 | `configs/docs.yaml` |
+| **③ GraphRAG** | 多跳关系 / 全局概览 | 抽三元组 → 知识图 + 实体消歧 → 图遍历 / 社区摘要 | `rag_lab.graph_*` |
 
-## 1. 放你的资料
+并配套两类**进阶检索技法**：三层 **query 改写**（规则 / 传统NLP / LLM）、
+**CLIP 图向量 vs 描述法**对比实验。
 
-把资料放到：
+---
 
-```powershell
-data/docs/
-```
-
-支持：
-
-- PDF：`.pdf`
-- 文本：`.txt`
-- Markdown：`.md`、`.markdown`
-
-要求：
-
-- PDF 最好是可复制文字的 PDF；扫描版图片 PDF 暂时不会 OCR。
-- 文件名尽量有意义，例如 `rag_chunking_notes.pdf`。
-- 初次实验建议先放 3-10 个文件，别一上来塞几百个。
-- `data/docs/` 默认被 git 忽略，适合放私人资料。
-
-放完后先检查系统看见了哪些文件：
+## 快速开始
 
 ```powershell
-python -m rag_lab.sources --config configs/play.yaml
+# 专用 conda 环境（不要用 base）
+conda env create -f environment.yml   # 或用现有 rag-tuning-lab 环境
+$py = "C:/Users/Administrator/miniconda3/envs/rag-tuning-lab/python.exe"
+$env:PYTHONIOENCODING = "utf-8"        # 让中文输出不乱码
+
+# LLM 密钥放 .env（已 gitignore，切勿提交）
+#   MINIMAX_API_KEY=...
+#   MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+#   MINIMAX_MODEL=MiniMax-M3
 ```
 
-## 2. 建库和查询
+---
 
+## 用法
+
+### ① 普通 RAG（医疗结构化语料）
 ```powershell
-conda activate rag-tuning-lab
-python -m rag_lab.ingest --config configs/play.yaml
-python -m rag_lab.query --config configs/play.yaml --query "你的问题"
+& $py -m rag_lab.ingest --config configs/diseases.yaml      # 建库
+& $py -m rag_lab.query  --config configs/diseases.yaml --query "苯中毒的症状和治疗"
+& $py -m rag_lab.ask    --config configs/diseases.yaml --query "..."   # 检索+生成带引用
 ```
 
-也可以继续用内置面试题：
-
+### ② 多模态 RAG（PDF：文字+表格+配图）
 ```powershell
-python -m rag_lab.query --config configs/play.yaml --query-id q_rerank
+& $py -m rag_lab.ingest --config configs/docs.yaml          # 抽文字/表格 + M3 给图配描述
+& $py -m rag_lab.ask    --config configs/docs.yaml --query "图神经网络有哪几种架构？"
+#   命中配图时会把真实图片喂回 M3 做图文联合回答
 ```
 
-如果你想只检索自己放到 `data/docs/` 的资料，不混入内置面试卡片：
-
+### 热启动 REPL（避免每次重载模型，第二问起几秒）
 ```powershell
-python -m rag_lab.ingest --config configs/play.yaml --set source.include_interview_cards=false
-python -m rag_lab.query --config configs/play.yaml --query "你的问题" --set source.include_interview_cards=false
+& $py -m rag_lab.repl --config configs/docs.yaml            # 一次加载，反复提问
+& $py -m rag_lab.repl --config configs/docs.yaml --no-llm   # 只检索，最快
 ```
 
-输出里重点看：
-
-- `source`：命中的文档或知识卡 id
-- `file`：如果来自 `data/docs/`，会显示文件路径和 PDF 页码
-- `vector`：向量召回分数
-- `bm25`：关键词召回分数
-- `rerank`：reranker 分数
-- `ranks`：在不同阶段的排名
-
-## 3. 对比实验
-
-对比 rerank 是否有用：
-
+### 三层 query 改写（解决 语义鸿沟 / 意图模糊 / 历史指代）
 ```powershell
-python -m rag_lab.query --config configs/play.yaml --query-id q_rerank --set rerank.mode=none
-python -m rag_lab.query --config configs/play.yaml --query-id q_rerank --set rerank.mode=cross_encoder
+& $py -m rag_lab.ask --config configs/diseases.yaml --set query.llm=rewrite `
+      --history "用户：我确诊了糖尿病" --query "它有哪些并发症？"
+# query.rules(规则) / query.nlp(传统NLP) / query.llm(rewrite|hyde|multi) 三层可独立开关
 ```
 
-跑参数网格：
-
+### ③ GraphRAG
 ```powershell
-python -m rag_lab.sweep --config configs/play.yaml --query-id q_rerank --vary chunking.chunk_size=240,360,520 --vary retrieval.candidate_k=6,12 --vary rerank.mode=none,cross_encoder
+& $py -m rag_lab.graph_extract --config configs/docs.yaml --keywords "maple,clip2scene,vita_clip" --per-paper 4
+& $py -m rag_lab.graph_build   --embed-dedup        # 建图 + 实体消歧（字符串+embedding）
+& $py -m rag_lab.graph_query   --query "和 Vita-CLIP 用同一基础模型的论文有哪些？" --hops 2
+& $py -m rag_lab.graph_community --summarize --query "这批论文整体在研究哪些方向？"
 ```
 
-看这些指标：
-
-- `hit`：是否命中 expected source
-- `first_rank`：正确资料第一次出现的排名
-- `mrr`：正确资料越靠前越高
-- `top_sources`：最终排在前面的来源
-
-## 4. 最值得调的参数
-
-`chunking.chunk_size`  
-每个 chunk 多长。太小容易丢上下文，太大容易引入噪声。
-
-`chunking.chunk_overlap`  
-相邻 chunk 重叠多少。大一点更不容易切断答案，但重复内容会变多。
-
-`retrieval.candidate_k`  
-第一阶段召回多少候选给 reranker。太小可能漏答案，太大更慢。
-
-`retrieval.top_k`  
-最终返回多少条。太少信息不足，太多噪声变大。
-
-`retrieval.hybrid`  
-是否启用向量召回 + BM25 关键词召回。
-
-`retrieval.vector_weight`  
-语义召回权重。概念型问题可以高一点。
-
-`retrieval.bm25_weight`  
-关键词召回权重。版本号、错误码、字段名、专有名词场景可以高一点。
-
-`rerank.mode`  
-可选：`none`、`bm25`、`overlap`、`cross_encoder`。重点对比 `none` 和 `cross_encoder`。
-
-`rerank.weight`  
-最终排序里 rerank 占比。越高越相信 reranker。
-
-## 5. Milvus 版本
-
-同样的神经模型，向量库换成 Milvus Lite：
-
+### 实验追踪（用数字代替感觉）
 ```powershell
-python -m rag_lab.ingest --config configs/play_milvus.yaml
-python -m rag_lab.query --config configs/play_milvus.yaml --query "你的问题"
+& $py -m rag_lab.experiment --config configs/diseases.yaml --label "my-run"
+& $py -m rag_lab.clip_index --config configs/docs.yaml --build   # CLIP vs 描述法
+& $py -m rag_lab.clip_index --config configs/docs.yaml --compare
+type experiments\LEADERBOARD.md
 ```
 
-Docker Milvus Standalone 配置在：
+---
 
-```powershell
-infra/milvus/docker-compose.yml
+## 实验结果（真实数据，详见 `experiments/`）
+
+- **检索调参**（医疗集，`experiments/LEADERBOARD.md`）：候选池 12→50、BM25 权重 0.3→0.6，
+  Recall@5 **0.30 → 0.70**，MRR 0.30 → 0.55。
+- **三层 query 改写**：MRR 0.50 → 0.575，nDCG@5 0.59 → 0.72，BM25 Recall@10 → 1.00。
+- **CLIP 图向量 vs 描述法**（`experiments/clip_vs_caption.md`）：描述法 **10/10**，CLIP 3/10——
+  文档框架图含义在文字里，CLIP 读不了图中文字；且我们喂的是整页渲染，稀释了 CLIP 视觉信号。
+- **延迟**：冷启动 ~40s 中 ~32s 是模型加载（一次性）；真正检索仅 ~2s。REPL 热启动后每问 ~2.7s。
+
+---
+
+## 架构（`src/rag_lab/`）
+
 ```
-
-启动：
-
-```powershell
-.\scripts\start_milvus.ps1
+建库(离线): 语料 → loaders/structured/multimodal → chunking → embeddings → stores(Chroma)
+查询(在线): 问题 → [query_rewrite] → 向量+BM25 → RRF(pipeline) → rerankers → [generate(MiniMax)]
+评测:       metrics + experiment(追踪) ;  GraphRAG: graph_extract/build/query/community
 ```
+核心编排在 `pipeline.py`。各模块均有详细中文注释。
 
-## 6. 面试练习模式
+## 工程要点
+- **离线重、在线轻**：贵的活（embedding、图抽取）放建库；查询只剩检索+生成。
+- **缓存**：embedder / cross-encoder / chunks+BM25 跨查询复用；图描述落盘缓存（断点续跑、不重复计费）。
+- **容错**：单张图 caption 失败不拖垮建库；图文请求失败自动退回纯文字。
+- **追踪**：每次实验记 git sha + 参数 + 多阶段指标 + 延迟，进 `LEADERBOARD.md`。
 
-```powershell
-python -m rag_lab.interview_game --config configs/play.yaml --rounds 5
-```
+## 诚实的局限
+- 评测集较小；GraphRAG 图偏稀疏、字符串消歧抓不住全部语义近义词、抽取有噪声。
+- 多语言 MiniLM 对中文医疗文本偏弱（vector-only 召回约 0.20）——可换中文专用 embedding。
 
-每轮先自己回答，再看 retrieval trace。重点不是背答案，而是看检索链路哪里成功、哪里失败。
+详细路线图见 [ROADMAP.md](ROADMAP.md)。

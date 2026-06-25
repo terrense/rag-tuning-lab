@@ -73,8 +73,47 @@ def _paper_of(source_id: str) -> str:
     return re.sub(r"_p\d+.*$", "", source_id or "")
 
 
-def build_graph(triples: list[dict]) -> nx.MultiDiGraph:
+def _embedding_merge(names: list[str], cfg: dict, threshold: float = 0.9) -> dict[str, str]:
+    """用 embedding 余弦相似度把语义近义的实体名归并（字符串消歧抓不住的那种）。
+
+    返回 名字 -> 簇代表名（取簇内最短的，通常最干净）。
+    """
+    import numpy as np
+    from rag_lab.embeddings import get_embedder
+    names = list(names)
+    if len(names) < 2:
+        return {n: n for n in names}
+    vecs = np.asarray(get_embedder(cfg).embed(names), dtype="float32")
+    norms = np.linalg.norm(vecs, axis=1, keepdims=True); norms[norms == 0] = 1
+    vecs = vecs / norms
+    sims = vecs @ vecs.T
+    parent = list(range(len(names)))            # 并查集
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            if sims[i, j] >= threshold:
+                parent[find(j)] = find(i)
+    clusters: dict[int, list[str]] = {}
+    for i, n in enumerate(names):
+        clusters.setdefault(find(i), []).append(n)
+    mapping = {}
+    for members in clusters.values():
+        rep = min(members, key=len)             # 簇代表 = 最短名
+        for m in members:
+            mapping[m] = rep
+    return mapping
+
+
+def build_graph(triples: list[dict], cfg: dict | None = None,
+                embed_dedup: bool = False, threshold: float = 0.9) -> nx.MultiDiGraph:
     canon = _build_canonical_map(triples)
+    if embed_dedup and cfg is not None:
+        # 在字符串消歧之上，再用 embedding 合并语义近义的规范名
+        merge = _embedding_merge(sorted(set(canon.values())), cfg, threshold)
+        canon = {surface: merge.get(disp, disp) for surface, disp in canon.items()}
     g = nx.MultiDiGraph()
     for t in triples:
         h = canon[t["head"]]
@@ -133,11 +172,15 @@ def save_graph(g: nx.MultiDiGraph) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description="GraphRAG step 2: build + dedup graph.")
     p.add_argument("--triples", default=str(TRIPLES_FILE))
+    p.add_argument("--config", default="configs/docs.yaml")
+    p.add_argument("--embed-dedup", action="store_true", help="额外用 embedding 合并语义近义实体")
+    p.add_argument("--threshold", type=float, default=0.9)
     args = p.parse_args()
     data = json.loads(Path(args.triples).read_text(encoding="utf-8"))
     triples = data["triples"]
-    print(f"读入 {len(triples)} 个三元组")
-    g = build_graph(triples)
+    print(f"读入 {len(triples)} 个三元组" + ("（含 embedding 消歧）" if args.embed_dedup else ""))
+    cfg = load_config(args.config) if args.embed_dedup else None
+    g = build_graph(triples, cfg=cfg, embed_dedup=args.embed_dedup, threshold=args.threshold)
     summarize(g)
     save_graph(g)
 
