@@ -17,24 +17,9 @@ LLM 用 MiniMax M3（OpenAI 兼容的 chat-completions 接口）。全部配置/
 
 from __future__ import annotations
 
-import os
-import re
-from pathlib import Path
 from typing import Any
 
 from rag_lab.models import SearchHit
-
-# MiniMax M3 是“推理模型”：答案前会先输出一段 <think>...</think> 思考。
-# 这个正则用来把思考块剥掉，只留最终答案。
-_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
-
-
-def _strip_think(text: str) -> str:
-    """去掉 <think>...</think>。若思考块被截断（只有开头没结尾），丢弃其前缀。"""
-    cleaned = _THINK_RE.sub("", text)
-    if "<think>" in cleaned:
-        cleaned = cleaned.split("</think>")[-1].replace("<think>", "")
-    return cleaned.strip()
 
 # 系统提示词：约束模型“只用资料、可溯源、医疗免责”
 SYSTEM_PROMPT = (
@@ -44,21 +29,6 @@ SYSTEM_PROMPT = (
     "回答要简洁、专业；在每个关键结论后用方括号标注引用的资料编号，例如 [1]、[2]。"
     "注意：这些资料来自疾病百科，仅供参考，不能替代医生诊断。"
 )
-
-
-def _load_dotenv(path: str | Path = ".env") -> None:
-    """极简 .env 加载器（按 KEY=VALUE 逐行读）。不覆盖已存在的环境变量。"""
-    p = Path(path)
-    if not p.exists():
-        return
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:   # 跳过空行/注释
-            continue
-        key, value = line.split("=", 1)
-        key, value = key.strip(), value.strip()
-        if key and key not in os.environ:
-            os.environ[key] = value
 
 
 def build_context(hits: list[SearchHit], max_chars: int = 600) -> tuple[str, list[dict]]:
@@ -79,44 +49,17 @@ def call_minimax(
     *,
     max_tokens: int | None = None,
     temperature: float | None = None,
+    role: str = "generate",
 ) -> dict[str, Any]:
-    """通用的 MiniMax M3 调用：给一组 messages，返回 {text(已剥思考), usage, model}。
+    """历史入口，现在是 rag_lab.llm.chat 的薄壳（名字保留是为了兼容旧调用点）。
 
-    生成答案(generate_answer)和查询改写(query_rewrite)都复用它，避免重复写 HTTP/鉴权。
+    role 决定实际走哪个模型（见 llm.py 的角色路由表）；默认 generate → minimax，
+    与旧行为完全一致。graph_*/multimodal/query_rewrite 各自传自己的 role，
+    这样 yaml 里 llm.roles.* 一改，全链路的模型分工就换了——A/B 实验的开关。
     """
-    _load_dotenv()                                      # 先把 .env 里的 key 读进环境变量
-    gen_cfg = cfg.get("generation", {})
-    api_key = os.environ.get("MINIMAX_API_KEY", "")
-    base_url = os.environ.get("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1").rstrip("/")
-    model = gen_cfg.get("model") or os.environ.get("MINIMAX_MODEL", "MiniMax-M3")
-    if not api_key:
-        raise RuntimeError(
-            "MINIMAX_API_KEY not set. Put it in .env (gitignored) as MINIMAX_API_KEY=..."
-        )
+    from rag_lab.llm import chat
 
-    try:
-        import requests
-    except ImportError as exc:  # pragma: no cover
-        raise RuntimeError("generation needs 'requests'. Run: pip install requests") from exc
-
-    # 组装 OpenAI 兼容的请求体
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": float(gen_cfg.get("temperature", 0.2)) if temperature is None else temperature,
-        # max_tokens 要够大：既要装下 <think> 思考，又要装下最终输出，否则会被截断
-        "max_tokens": int(gen_cfg.get("max_tokens", 2048)) if max_tokens is None else max_tokens,
-    }
-    resp = requests.post(
-        f"{base_url}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=float(gen_cfg.get("timeout", 60)),
-    )
-    resp.raise_for_status()                              # 非 2xx 直接抛错
-    data = resp.json()
-    raw = data["choices"][0]["message"]["content"]
-    return {"text": _strip_think(raw), "usage": data.get("usage"), "model": model}
+    return chat(cfg, messages, role=role, max_tokens=max_tokens, temperature=temperature)
 
 
 def _figure_images(hits: list[SearchHit], limit: int) -> list[str]:

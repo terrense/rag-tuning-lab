@@ -12,6 +12,7 @@ metrics.py —— 检索评测指标（信息检索 IR 标准指标）
 from __future__ import annotations
 
 import math
+import random as _random
 from typing import Iterable
 
 DEFAULT_KS = (1, 3, 5, 10)   # 默认在这些 k 上算指标
@@ -83,3 +84,60 @@ def mean_metrics(rows: list[dict], ks: tuple[int, ...] = DEFAULT_KS) -> dict[str
     for key in keys:
         agg[key] = sum(float(r.get(key) or 0.0) for r in rows) / n
     return agg
+
+
+# ============================================================================
+# 统计显著性（P0-E0.5）：让 LEADERBOARD 上的差异"可信"，而不是噪声
+# ----------------------------------------------------------------------------
+# 为什么需要：N=10 的评测集上 Recall 0.70 vs 0.60 只差"一道题"，完全可能是
+# 运气。两件工具：
+#   bootstrap_ci             单个 run 的指标该报成 0.70 ± 多少（95% 置信区间）
+#   paired_permutation_test  两个 run 的差异是真提升还是噪声（p 值）
+# 都是无分布假设的重采样方法——评测指标（0/1 的 hit、截断的 mrr）远不是正态
+# 分布，t 检验的前提不成立，所以用重采样而不是查表。
+# ============================================================================
+def bootstrap_ci(
+    values: list[float], n_boot: int = 10000, alpha: float = 0.05, seed: int = 0
+) -> tuple[float, float, float]:
+    """逐题指标 → (均值, CI下界, CI上界)。
+
+    做法：把 N 道题的成绩当作总体的样本，有放回地重抽 N 道题、算均值，
+    重复 n_boot 次，取 [2.5%, 97.5%] 分位数。区间宽度直观反映"评测集
+    有多小"——10 题的区间宽得吓人，这正是要扩评测集的证据。
+    """
+    if not values:
+        return 0.0, 0.0, 0.0
+    rng = _random.Random(seed)
+    n = len(values)
+    mean = sum(values) / n
+    boots = sorted(
+        sum(rng.choices(values, k=n)) / n for _ in range(n_boot)
+    )
+    lo = boots[int(alpha / 2 * n_boot)]
+    hi = boots[min(n_boot - 1, int((1 - alpha / 2) * n_boot))]
+    return mean, lo, hi
+
+
+def paired_permutation_test(
+    a: list[float], b: list[float], n_perm: int = 10000, seed: int = 0
+) -> dict[str, float]:
+    """配对置换检验：A、B 两套配置在同一批题上的逐题成绩，差异显著吗？
+
+    配对的意义：同一道题两边都答了，比较的是"逐题差值"，题目难度本身的
+    方差被消掉——比把两组当独立样本灵敏得多。
+    零假设：A 和 B 没差别 → 每道题的差值正负号可以随便翻。
+    做法：随机翻转差值符号 n_perm 次，看"真实平均差值"在这个零分布里有
+    多极端。双尾 p < 0.05 → 差异大概率不是噪声。
+    """
+    assert len(a) == len(b), "paired test needs the same queries on both sides"
+    diffs = [x - y for x, y in zip(a, b)]
+    observed = sum(diffs) / (len(diffs) or 1)
+    if all(d == 0 for d in diffs):
+        return {"mean_diff": 0.0, "p_value": 1.0}
+    rng = _random.Random(seed)
+    hits = 0
+    for _ in range(n_perm):
+        s = sum(d if rng.random() < 0.5 else -d for d in diffs) / len(diffs)
+        if abs(s) >= abs(observed) - 1e-12:
+            hits += 1
+    return {"mean_diff": observed, "p_value": (hits + 1) / (n_perm + 1)}

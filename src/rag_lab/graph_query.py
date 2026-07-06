@@ -88,7 +88,7 @@ def answer(cfg: dict, query: str, hops: int = 1) -> dict:
            "要说清实体之间的关系链；不要编造关系。资料不足就直说。")
     user = f"问题：{query}\n\n【关系事实】\n{fact_lines}\n\n请据此回答。"
     out = call_minimax(cfg, [{"role": "system", "content": sys},
-                             {"role": "user", "content": user}], max_tokens=1024)
+                             {"role": "user", "content": user}], max_tokens=1024, role="graph")
     return {"entities": entities, "facts": facts, "papers": papers, "answer": out["text"]}
 
 

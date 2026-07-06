@@ -39,3 +39,8 @@ storage/figures_meta.json
 storage/graph_triples.json
 storage/graph.json
 storage/communities.json
+
+# External benchmark datasets (downloaded, large)
+data/external/
+# evalgen resumable cache
+storage/evalgen_cache.json

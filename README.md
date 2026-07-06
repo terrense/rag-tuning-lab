@@ -5,7 +5,9 @@
 而是"改一个变量 → 看指标变化 → 理解它解决了哪类失败"。
 
 > 配置驱动（`configs/*.yaml` + `--set a.b=c` 覆盖），离线建库 / 在线查询分离，
-> 实验自动记录到 `experiments/`。LLM 用 **MiniMax M3**，向量库 **Chroma**。
+> 实验自动记录到 `experiments/`。向量库 **Chroma**。三个 LLM 按任务分工
+> （`llm.py` 角色路由，yaml 一行切换）：**MiniMax M3** 多模态+生成、
+> **deepseek-v4-pro** 裁判/质检、**deepseek-v4-flash** 便宜跑量（改写/出题）。
 
 ---
 
@@ -75,13 +77,18 @@ $env:PYTHONIOENCODING = "utf-8"        # 让中文输出不乱码
 & $py -m rag_lab.graph_community --summarize --query "这批论文整体在研究哪些方向？"
 ```
 
-### 实验追踪（用数字代替感觉）
+### 实验追踪（用数字代替感觉，且带显著性检验）
 ```powershell
 & $py -m rag_lab.experiment --config configs/diseases.yaml --label "my-run"
+& $py -m rag_lab.compare_runs --a my-run --b v2-baseline        # 配对置换检验：差异是真的吗（p值）
+& $py -m rag_lab.gen_eval --config configs/diseases.yaml --label "gen-run"  # 生成端：引用指标+LLM裁判
+& $py -m rag_lab.evalgen --n 150 --seed 42                      # 重建自动评测集（flash出题+pro质检）
 & $py -m rag_lab.clip_index --config configs/docs.yaml --build   # CLIP vs 描述法
 & $py -m rag_lab.clip_index --config configs/docs.yaml --compare
 type experiments\LEADERBOARD.md
 ```
+评测集 v2：119 题（10 手写 + 109 生成，科室分层、四风格、双模型交叉质检）。
+LEADERBOARD 每行带 bootstrap 95% CI。实验路线图见 `experiments/PLAN.md`。
 
 ---
 

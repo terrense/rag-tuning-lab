@@ -60,7 +60,7 @@ def extract_triples(cfg: dict, text: str, max_triples: int = 12) -> list[dict]:
     """对一段文本抽三元组。"""
     user = f"最多抽 {max_triples} 个三元组。文本：\n{text[:1500]}"
     out = call_minimax(cfg, [{"role": "system", "content": _SYS},
-                             {"role": "user", "content": user}], max_tokens=800)
+                             {"role": "user", "content": user}], max_tokens=800, role="graph")
     return _parse_json_array(out["text"])[:max_triples]
 
 

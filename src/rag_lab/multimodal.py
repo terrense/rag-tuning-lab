@@ -124,7 +124,7 @@ def _caption_image(cfg: dict, png_path: Path) -> str:
             {"type": "image_url", "image_url": {"url": data_uri}},
         ]},
     ]
-    out = call_minimax(cfg, messages, max_tokens=400)
+    out = call_minimax(cfg, messages, max_tokens=400, role="caption")
     return out["text"].strip()
 
 

@@ -117,6 +117,7 @@ def layer3_rewrite(cfg: dict[str, Any], query: str, history: list[str] | None) -
         cfg,
         [{"role": "system", "content": _REWRITE_SYS}, {"role": "user", "content": user}],
         max_tokens=256,
+        role="rewrite",
     )
     return out["text"].strip() or query
 
@@ -129,6 +130,7 @@ def layer3_multi(cfg: dict[str, Any], query: str, history: list[str] | None, n: 
         cfg,
         [{"role": "system", "content": _MULTI_SYS.format(n=n)}, {"role": "user", "content": user}],
         max_tokens=256,
+        role="rewrite",
     )
     variants = [line.strip(" -·•\t") for line in out["text"].splitlines() if line.strip()]
     return variants[:n]
@@ -142,6 +144,7 @@ def layer3_hyde(cfg: dict[str, Any], query: str, history: list[str] | None) -> s
         cfg,
         [{"role": "system", "content": _HYDE_SYS}, {"role": "user", "content": user}],
         max_tokens=int(cfg.get("query", {}).get("hyde_max_tokens", 256)),
+        role="rewrite",
     )
     return out["text"].strip() or query
 

@@ -1,0 +1,601 @@
+# 医疗评测集 v2 —— 手写锚点(10题) + LLM 自动生成
+# 生成: deepseek-flash | 质检: deepseek-pro | seed=42
+# 流程: 科室分层采样 -> flash 出题(四风格轮转) -> 规则校验 -> pro 质检
+# 统计: 采样150 生成150 规则淘汰0 质检淘汰41 最终109 (+10 手写)
+# 由 python -m rag_lab.evalgen 生成；不要手改生成题，重跑脚本即可。
+queries:
+- id: d_benzene
+  question: 长期吸入苯蒸气会不会中毒？会有哪些症状，需要做什么检查？
+  expected_source_ids:
+  - disease_00000
+  note: 苯中毒；属性块曾因切块丢失病名 → prepend_title 修复的样例。
+- id: d_diabetes
+  question: 经常口渴、多饮多尿、乏力，血糖升高，可能是什么病？怎么治疗？
+  expected_source_ids:
+  - disease_04600
+  note: 糖尿病；症状导向，无病名。
+- id: d_appendicitis
+  question: 突然右下腹剧烈腹痛伴恶心呕吐，是不是急性阑尾炎？该挂哪个科？
+  expected_source_ids:
+  - disease_00286
+  note: 急性阑尾炎。
+- id: d_hypertension
+  question: 血压高、头晕目眩、乏力、后脑有重压感，应该看哪个科，怎么处理？
+  expected_source_ids:
+  - disease_00103
+  note: 高血压；症状导向。
+- id: d_tb
+  question: 长期低热、咳嗽、咯血、消瘦，会不会是肺结核？挂什么科？
+  expected_source_ids:
+  - disease_01771
+  note: 肺结核。
+- id: d_gout
+  question: 大脚趾关节夜里突然剧痛红肿，化验尿酸偏高，是痛风吗？看哪个科？
+  expected_source_ids:
+  - disease_00720
+  note: 痛风。
+- id: d_asthma
+  question: 反复发作的喘息、气促、双肺哮鸣音，是哮喘吗？怎么查？
+  expected_source_ids:
+  - disease_00060
+  note: 哮喘。
+- id: d_shingles
+  question: 身上沿着一条带子长出成簇水疱，伴明显神经痛，是什么病？
+  expected_source_ids:
+  - disease_01759
+  note: 带状疱疹；症状导向。
+- id: d_hyperthyroid
+  question: 怕热、多汗、心慌、消瘦、突眼、甲状腺肿大，是甲亢吗？挂哪个科？
+  expected_source_ids:
+  - disease_00117
+  note: 甲亢。
+- id: d_gastric_ulcer
+  question: 餐后上腹烧灼样疼痛、嗳气，胃镜怀疑溃疡，是胃溃疡吗？怎么治？
+  expected_source_ids:
+  - disease_05679
+  note: 胃溃疡。
+- id: g_01044_name_led
+  question: 化脓性关节炎通常需要挂哪个科室？
+  expected_source_ids:
+  - disease_01044
+  note: '[auto:name_led] 化脓性关节炎'
+- id: g_05601_exam_treat
+  question: 心脏黏液瘤确诊需要做哪些检查？
+  expected_source_ids:
+  - disease_05601
+  note: '[auto:exam_treat] 心脏黏液瘤'
+- id: g_05536_symptom_led
+  question: 皮肤上长了很多像鸡皮一样的小疙瘩，是什么病？
+  expected_source_ids:
+  - disease_05536
+  note: '[auto:symptom_led] 毛囊周角化病'
+- id: g_03999_name_led
+  question: 混合型阴道炎有哪些典型症状？
+  expected_source_ids:
+  - disease_03999
+  note: '[auto:name_led] 混合型阴道炎'
+- id: g_02728_symptom_led
+  question: 眼睛突出来看不清，眼球转不动还流鼻血，可能是什么病？
+  expected_source_ids:
+  - disease_02728
+  note: '[auto:symptom_led] 颈内动脉海绵窦瘘'
+- id: g_00112_name_led
+  question: 酒精性心肌病应该挂哪个科室？
+  expected_source_ids:
+  - disease_00112
+  note: '[auto:name_led] 酒精性心肌病'
+- id: g_00872_exam_treat
+  question: 确诊原发性硬化性胆管炎需要做哪些检查？
+  expected_source_ids:
+  - disease_00872
+  note: '[auto:exam_treat] 原发性硬化性胆管炎'
+- id: g_04261_name_led
+  question: 肝性脑病通常有哪些典型症状？
+  expected_source_ids:
+  - disease_04261
+  note: '[auto:name_led] 肝性脑病'
+- id: g_03969_exam_treat
+  question: 眼眶非霍奇金恶性淋巴肿瘤一般怎么治疗？
+  expected_source_ids:
+  - disease_03969
+  note: '[auto:exam_treat] 眼眶非霍奇金恶性淋巴肿瘤'
+- id: g_02732_colloquial
+  question: 我脸上和脖子上长了好多黄色的扁平疙瘩，不疼不痒的，是咋回事？
+  expected_source_ids:
+  - disease_02732
+  note: '[auto:colloquial] 泛发性扁平黄色瘤'
+- id: g_02345_symptom_led
+  question: 我最近骨头痛得厉害，肩膀抬不起来，体重也掉了不少，可能是什么问题？
+  expected_source_ids:
+  - disease_02345
+  note: '[auto:symptom_led] 骨癌'
+- id: g_05220_exam_treat
+  question: 化脓性角膜炎一般需要做什么检查来确诊？
+  expected_source_ids:
+  - disease_05220
+  note: '[auto:exam_treat] 化脓性角膜炎'
+- id: g_02579_symptom_led
+  question: 膝盖打软无力，伸直时弹响疼痛，可能是什么问题？
+  expected_source_ids:
+  - disease_02579
+  note: '[auto:symptom_led] 髌骨脱位'
+- id: g_00266_exam_treat
+  question: 确诊急性胃扩张需要做哪些检查？
+  expected_source_ids:
+  - disease_00266
+  note: '[auto:exam_treat] 急性胃扩张'
+- id: g_04375_symptom_led
+  question: 阴囊突然剧痛、红肿、发黑，还发高烧，可能是什么病？
+  expected_source_ids:
+  - disease_04375
+  note: '[auto:symptom_led] 阴囊坏疽'
+- id: g_02452_name_led
+  question: 肠病性肢端皮炎的主要症状有哪些？
+  expected_source_ids:
+  - disease_02452
+  note: '[auto:name_led] 肠病性肢端皮炎'
+- id: g_02080_exam_treat
+  question: 确诊无机碱皮肤损伤需要做哪些检查？
+  expected_source_ids:
+  - disease_02080
+  note: '[auto:exam_treat] 无机碱皮肤损伤'
+- id: g_00608_colloquial
+  question: 皮肤上长个包，有黑头，是什么问题？
+  expected_source_ids:
+  - disease_00608
+  note: '[auto:colloquial] 外科皮脂腺囊肿'
+- id: g_04844_symptom_led
+  question: 淋巴结肿大、肝脾肿大和溶骨性损害，可能是什么疾病？
+  expected_source_ids:
+  - disease_04844
+  note: '[auto:symptom_led] 重链病'
+- id: g_00652_name_led
+  question: 慢性淋巴细胞性白血病的治疗方式有哪些？
+  expected_source_ids:
+  - disease_00652
+  note: '[auto:name_led] 慢性淋巴细胞性白血病'
+- id: g_01261_exam_treat
+  question: 确诊非炎性单纯性突眼需要做哪些检查？
+  expected_source_ids:
+  - disease_01261
+  note: '[auto:exam_treat] 非炎性单纯性突眼'
+- id: g_03382_colloquial
+  question: 得过脑炎后，现在老是抽风、口吐白沫、不省人事，这是咋回事？
+  expected_source_ids:
+  - disease_03382
+  note: '[auto:colloquial] 脑炎后遗症'
+- id: g_05740_symptom_led
+  question: 为什么我一站起来就头晕、眼前发黑，有时还会晕倒？
+  expected_source_ids:
+  - disease_05740
+  note: '[auto:symptom_led] 原发性直立性低血压'
+- id: g_04229_name_led
+  question: 遗传性凝血因子Ⅹ缺乏有哪些主要症状？
+  expected_source_ids:
+  - disease_04229
+  note: '[auto:name_led] 遗传性凝血因子Ⅹ缺乏'
+- id: g_02243_exam_treat
+  question: 接触性皮炎一般怎么治疗？
+  expected_source_ids:
+  - disease_02243
+  note: '[auto:exam_treat] 接触性皮炎'
+- id: g_03626_symptom_led
+  question: 咳嗽咳出铁锈色的痰，还发烧打寒战，胸口疼，呼吸费力，可能是什么病？
+  expected_source_ids:
+  - disease_03626
+  note: '[auto:symptom_led] 下呼吸道感染'
+- id: g_02338_name_led
+  question: 闭锁肺综合征的常见诱因有哪些？
+  expected_source_ids:
+  - disease_02338
+  note: '[auto:name_led] 闭锁肺综合征'
+- id: g_02153_exam_treat
+  question: 不孕不育一般需要做哪些检查项目？
+  expected_source_ids:
+  - disease_02153
+  note: '[auto:exam_treat] 不孕不育'
+- id: g_05738_name_led
+  question: 胆道蛔虫病与肝蛔虫病的主要病因是什么？
+  expected_source_ids:
+  - disease_05738
+  note: '[auto:name_led] 胆道蛔虫病与肝蛔虫病'
+- id: g_01376_exam_treat
+  question: 确诊痛经常需要做哪些检查项目？
+  expected_source_ids:
+  - disease_01376
+  note: '[auto:exam_treat] 痛经'
+- id: g_05868_symptom_led
+  question: 被老鼠咬过后发冷发热，身上起红疹，可能是什么病？
+  expected_source_ids:
+  - disease_05868
+  note: '[auto:symptom_led] 鼠咬热'
+- id: g_04408_name_led
+  question: 假膜性小肠结肠炎通常由什么原因引起？
+  expected_source_ids:
+  - disease_04408
+  note: '[auto:name_led] 假膜性小肠结肠炎'
+- id: g_05168_exam_treat
+  question: 外伤性硬膜下积液的治疗方式主要有哪些？
+  expected_source_ids:
+  - disease_05168
+  note: '[auto:exam_treat] 外伤性硬膜下积液'
+- id: g_00433_colloquial
+  question: 小便时有刺痛感，还带血，排尿像有东西堵着，怎么办？
+  expected_source_ids:
+  - disease_00433
+  note: '[auto:colloquial] 尿道结石'
+- id: g_00535_name_led
+  question: 直立性低血压患者应该挂哪个科室？
+  expected_source_ids:
+  - disease_00535
+  note: '[auto:name_led] 直立性低血压'
+- id: g_04823_exam_treat
+  question: 确诊痔疮通常需要做哪些检查？
+  expected_source_ids:
+  - disease_04823
+  note: '[auto:exam_treat] 痔'
+- id: g_01112_symptom_led
+  question: 摔了一跤手掌撑地，现在手腕肿痛，可能是哪个部位出了问题？
+  expected_source_ids:
+  - disease_01112
+  note: '[auto:symptom_led] 桡骨远端骨折'
+- id: g_02094_name_led
+  question: 食道溃疡的典型症状有哪些，怎么治疗？
+  expected_source_ids:
+  - disease_02094
+  note: '[auto:name_led] 食道溃疡'
+- id: g_04237_exam_treat
+  question: 肺性脑病一般需要做哪些检查来确诊？
+  expected_source_ids:
+  - disease_04237
+  note: '[auto:exam_treat] 肺性脑病'
+- id: g_02230_symptom_led
+  question: 脸上皱纹多、长斑，还总面无表情，可能是什么病？
+  expected_source_ids:
+  - disease_02230
+  note: '[auto:symptom_led] 屏幕脸'
+- id: g_02562_name_led
+  question: 单纯性脊柱结核通常有哪些症状？
+  expected_source_ids:
+  - disease_02562
+  note: '[auto:name_led] 单纯性脊柱结核'
+- id: g_01255_exam_treat
+  question: 确诊颞叶肿瘤需要做哪些检查？
+  expected_source_ids:
+  - disease_01255
+  note: '[auto:exam_treat] 颞叶肿瘤'
+- id: g_04087_symptom_led
+  question: 看到密集小物体就恶心头晕，可能是什么问题？
+  expected_source_ids:
+  - disease_04087
+  note: '[auto:symptom_led] 密集恐惧症'
+- id: g_04611_name_led
+  question: 肝肾综合征有哪些典型症状？
+  expected_source_ids:
+  - disease_04611
+  note: '[auto:name_led] 肝肾综合征'
+- id: g_02507_exam_treat
+  question: 确诊持续性植物状态需要做哪些检查？
+  expected_source_ids:
+  - disease_02507
+  note: '[auto:exam_treat] 持续性植物状态'
+- id: g_00482_colloquial
+  question: 头老是像紧箍咒一样紧，脖子也硬邦邦的，咋回事？
+  expected_source_ids:
+  - disease_00482
+  note: '[auto:colloquial] 紧张性头痛'
+- id: g_05411_symptom_led
+  question: 婴幼儿眼球突出、上眼皮下垂，可能是什么病？
+  expected_source_ids:
+  - disease_05411
+  note: '[auto:symptom_led] 眼部毛细血管瘤'
+- id: g_02686_name_led
+  question: 鼻肿瘤患者通常会出现哪些症状？
+  expected_source_ids:
+  - disease_02686
+  note: '[auto:name_led] 鼻肿瘤'
+- id: g_01767_exam_treat
+  question: 确诊哮喘持续状态需要做哪些检查？
+  expected_source_ids:
+  - disease_01767
+  note: '[auto:exam_treat] 哮喘持续状态'
+- id: g_05000_symptom_led
+  question: 过早绝经还总是潮热乏力心慌，可能是哪里出了问题？
+  expected_source_ids:
+  - disease_05000
+  note: '[auto:symptom_led] 卵巢功能缺如综合征'
+- id: g_00271_name_led
+  question: 结核性肠系膜淋巴结炎如何进行治疗？
+  expected_source_ids:
+  - disease_00271
+  note: '[auto:name_led] 结核性肠系膜淋巴结炎'
+- id: g_01715_exam_treat
+  question: 舌下间隙感染一般怎么治疗？
+  expected_source_ids:
+  - disease_01715
+  note: '[auto:exam_treat] 舌下间隙感染'
+- id: g_03199_symptom_led
+  question: 眼睛发炎、视野缺损、看东西重影还神经痛，是什么问题？
+  expected_source_ids:
+  - disease_03199
+  note: '[auto:symptom_led] 多发性硬化伴发的葡萄膜炎'
+- id: g_02309_name_led
+  question: 向颈段脊髓供血的根动脉缺血症候群应该挂哪个科？
+  expected_source_ids:
+  - disease_02309
+  note: '[auto:name_led] 向颈段脊髓供血的根动脉缺血症候群'
+- id: g_04047_exam_treat
+  question: 确诊阴茎珍珠疹需要做哪些检查？
+  expected_source_ids:
+  - disease_04047
+  note: '[auto:exam_treat] 阴茎珍珠疹'
+- id: g_03073_colloquial
+  question: 我血糖高、血压也高，还胖，胸口时不时疼，尿里还有油，是咋回事？
+  expected_source_ids:
+  - disease_03073
+  note: '[auto:colloquial] 高脂血症'
+- id: g_05173_name_led
+  question: 赖特综合征性巩膜炎该怎么治疗？
+  expected_source_ids:
+  - disease_05173
+  note: '[auto:name_led] 赖特综合征性巩膜炎'
+- id: g_01995_exam_treat
+  question: 确诊脾大需要做哪些检查？
+  expected_source_ids:
+  - disease_01995
+  note: '[auto:exam_treat] 脾大'
+- id: g_02916_name_led
+  question: 乳头乳晕角化过度症有哪些典型症状？
+  expected_source_ids:
+  - disease_02916
+  note: '[auto:name_led] 乳头乳晕角化过度症'
+- id: g_01432_exam_treat
+  question: 确诊包涵体性结膜炎需要做哪些检查？
+  expected_source_ids:
+  - disease_01432
+  note: '[auto:exam_treat] 包涵体性结膜炎'
+- id: g_04482_colloquial
+  question: 脑袋里老有呼呼的响声，还耳鸣，是咋回事？
+  expected_source_ids:
+  - disease_04482
+  note: '[auto:colloquial] 硬脑膜动静脉畸形'
+- id: g_00240_name_led
+  question: 非霍乱弧菌感染的主要症状有哪些？
+  expected_source_ids:
+  - disease_00240
+  note: '[auto:name_led] 非霍乱弧菌感染'
+- id: g_02268_exam_treat
+  question: 确诊宫角妊娠通常需要做哪些检查？
+  expected_source_ids:
+  - disease_02268
+  note: '[auto:exam_treat] 宫角妊娠'
+- id: g_02104_colloquial
+  question: 突然看东西缺了一块，视力下降，是怎么回事？
+  expected_source_ids:
+  - disease_02104
+  note: '[auto:colloquial] 视网膜分支动脉阻塞'
+- id: g_01403_symptom_led
+  question: 胎儿屁股朝下，分娩时容易出什么问题？
+  expected_source_ids:
+  - disease_01403
+  note: '[auto:symptom_led] 臀先露'
+- id: g_00518_name_led
+  question: 小儿结核性脑膜炎的早期症状有哪些？
+  expected_source_ids:
+  - disease_00518
+  note: '[auto:name_led] 小儿结核性脑膜炎'
+- id: g_05363_exam_treat
+  question: 确诊维生素B1缺乏症需要做哪些检查？
+  expected_source_ids:
+  - disease_05363
+  note: '[auto:exam_treat] 维生素B1缺乏症'
+- id: g_00050_name_led
+  question: 气管、支气管狭窄应该挂什么科？
+  expected_source_ids:
+  - disease_00050
+  note: '[auto:name_led] 气管、支气管狭窄'
+- id: g_00667_exam_treat
+  question: 血栓性血小板减少性紫癜一般怎么治疗？
+  expected_source_ids:
+  - disease_00667
+  note: '[auto:exam_treat] 血栓性血小板减少性紫癜'
+- id: g_00978_name_led
+  question: 成软骨细胞瘤一般需要挂什么科室？
+  expected_source_ids:
+  - disease_00978
+  note: '[auto:name_led] 成软骨细胞瘤'
+- id: g_03291_exam_treat
+  question: 确诊创伤性膈疝需要做哪些检查？
+  expected_source_ids:
+  - disease_03291
+  note: '[auto:exam_treat] 创伤性膈疝'
+- id: g_04474_colloquial
+  question: 我家孩子看东西重影，眼睛一会儿正一会儿斜，怎么回事？
+  expected_source_ids:
+  - disease_04474
+  note: '[auto:colloquial] 周期性内斜视'
+- id: g_01722_symptom_led
+  question: 最近牙疼，咬肌肥大，下巴后缩明显，可能是什么原因？
+  expected_source_ids:
+  - disease_01722
+  note: '[auto:symptom_led] 下颌后缩'
+- id: g_01724_name_led
+  question: 牙周病通常怎么治疗？
+  expected_source_ids:
+  - disease_01724
+  note: '[auto:name_led] 牙周病'
+- id: g_02851_exam_treat
+  question: 巨人症需要做哪些检查来确诊？
+  expected_source_ids:
+  - disease_02851
+  note: '[auto:exam_treat] 巨人症'
+- id: g_05796_name_led
+  question: 十二指肠良性肿瘤的常见症状有哪些？
+  expected_source_ids:
+  - disease_05796
+  note: '[auto:name_led] 十二指肠良性肿瘤'
+- id: g_01087_exam_treat
+  question: 确诊胫腓骨骨折需要做哪些检查？
+  expected_source_ids:
+  - disease_01087
+  note: '[auto:exam_treat] 胫腓骨骨折'
+- id: g_01006_colloquial
+  question: 小孩老是骨折，骨头上还鼓起个包，疼得厉害，这是咋回事？
+  expected_source_ids:
+  - disease_01006
+  note: '[auto:colloquial] 骨囊肿'
+- id: g_01131_name_led
+  question: 先天性仰趾外翻足应该怎么治疗？
+  expected_source_ids:
+  - disease_01131
+  note: '[auto:name_led] 先天性仰趾外翻足'
+- id: g_05777_symptom_led
+  question: 我皮肤伤口长了个红色肉疙瘩，不疼但总流血，可能是什么病？
+  expected_source_ids:
+  - disease_05777
+  note: '[auto:symptom_led] 生脓性肉芽肿'
+- id: g_04966_name_led
+  question: 颅内黑色素瘤的典型症状有哪些？
+  expected_source_ids:
+  - disease_04966
+  note: '[auto:name_led] 颅内黑色素瘤'
+- id: g_02326_exam_treat
+  question: 确诊睑内翻通常需要做哪些检查？
+  expected_source_ids:
+  - disease_02326
+  note: '[auto:exam_treat] 睑内翻'
+- id: g_05247_symptom_led
+  question: 婴儿齿龈增生、短颈、胸廓畸形，反复上呼吸道感染，可能是什么病？
+  expected_source_ids:
+  - disease_05247
+  note: '[auto:symptom_led] 黏脂贮积症Ⅱ型'
+- id: g_03544_name_led
+  question: 急性硬脑膜下血肿的主要病因是什么？
+  expected_source_ids:
+  - disease_03544
+  note: '[auto:name_led] 急性硬脑膜下血肿'
+- id: g_04154_exam_treat
+  question: 下颌下间隙感染的治疗方式有哪些？
+  expected_source_ids:
+  - disease_04154
+  note: '[auto:exam_treat] 下颌下间隙感染'
+- id: g_01865_colloquial
+  question: 老是肚子疼，脸一会儿红一会儿白，血压还低，是什么问题？
+  expected_source_ids:
+  - disease_01865
+  note: '[auto:colloquial] 阑尾类癌'
+- id: g_03417_symptom_led
+  question: 孩子遗尿、便秘、下肢无力，可能是什么病？
+  expected_source_ids:
+  - disease_03417
+  note: '[auto:symptom_led] 脊髓栓系综合征'
+- id: g_04645_name_led
+  question: 原发性腮腺淋巴瘤有什么典型症状？
+  expected_source_ids:
+  - disease_04645
+  note: '[auto:name_led] 原发性腮腺淋巴瘤'
+- id: g_01382_exam_treat
+  question: 确诊月经不调需要做哪些检查？
+  expected_source_ids:
+  - disease_01382
+  note: '[auto:exam_treat] 月经不调'
+- id: g_03285_symptom_led
+  question: 视力下降、喝多尿多、头痛呕吐还嗜睡，可能是啥病？
+  expected_source_ids:
+  - disease_03285
+  note: '[auto:symptom_led] 生殖细胞瘤'
+- id: g_03148_name_led
+  question: 腰椎滑脱一般挂哪个科？
+  expected_source_ids:
+  - disease_03148
+  note: '[auto:name_led] 腰椎滑脱'
+- id: g_05645_exam_treat
+  question: 天疤疮一般怎么治疗？
+  expected_source_ids:
+  - disease_05645
+  note: '[auto:exam_treat] 天疤疮'
+- id: g_05748_name_led
+  question: 肾动脉血栓形成和栓塞有哪些典型症状？
+  expected_source_ids:
+  - disease_05748
+  note: '[auto:name_led] 肾动脉血栓形成和栓塞'
+- id: g_03255_exam_treat
+  question: 化脓性腱鞘炎需要做什么检查？
+  expected_source_ids:
+  - disease_03255
+  note: '[auto:exam_treat] 化脓性腱鞘炎'
+- id: g_03758_symptom_led
+  question: 骨头痛和骨膜炎，可能是过度运动导致的什么病？
+  expected_source_ids:
+  - disease_03758
+  note: '[auto:symptom_led] 胫骨应力骨折'
+- id: g_02477_name_led
+  question: 紫癜患者通常需要做哪些检查来确诊？
+  expected_source_ids:
+  - disease_02477
+  note: '[auto:name_led] 紫癜'
+- id: g_01698_exam_treat
+  question: 确诊毛舌需要做哪些检查项目？
+  expected_source_ids:
+  - disease_01698
+  note: '[auto:exam_treat] 毛舌'
+- id: g_00816_colloquial
+  question: 我头皮疼，眼皮肿，淋巴结也大，可能是什么问题？
+  expected_source_ids:
+  - disease_00816
+  note: '[auto:colloquial] 帽状腱膜下脓肿'
+- id: g_00477_name_led
+  question: 脊髓压迫症有哪些典型症状？
+  expected_source_ids:
+  - disease_00477
+  note: '[auto:name_led] 脊髓压迫症'
+- id: g_01063_exam_treat
+  question: 脊柱、脊髓损伤一般需要做哪些检查？
+  expected_source_ids:
+  - disease_01063
+  note: '[auto:exam_treat] 脊柱、脊髓损伤'
+- id: g_02742_name_led
+  question: 喉淀粉样变的主要治疗方法是什么？
+  expected_source_ids:
+  - disease_02742
+  note: '[auto:name_led] 喉淀粉样变'
+- id: g_03423_exam_treat
+  question: 确诊股骨转子间骨折需要做哪些检查？
+  expected_source_ids:
+  - disease_03423
+  note: '[auto:exam_treat] 股骨转子间骨折'
+- id: g_02673_colloquial
+  question: 我碰了农药后，肌肉一直跳还抽筋，浑身没劲，是怎么回事？
+  expected_source_ids:
+  - disease_02673
+  note: '[auto:colloquial] 拟除虫菊类农药中毒'
+- id: g_03085_name_led
+  question: 灰指甲一般应该挂哪个科室？
+  expected_source_ids:
+  - disease_03085
+  note: '[auto:name_led] 灰指甲'
+- id: g_00018_exam_treat
+  question: 肺炎性假瘤一般怎么治疗？
+  expected_source_ids:
+  - disease_00018
+  note: '[auto:exam_treat] 肺炎性假瘤'
+- id: g_04310_colloquial
+  question: 阴道里进了水蛭怎么办？出血还起疙瘩。
+  expected_source_ids:
+  - disease_04310
+  note: '[auto:colloquial] 阴道蚂蟥叮吸'
+- id: g_02933_symptom_led
+  question: 耳前有个小孔经常流黏液，可能是什么病？
+  expected_source_ids:
+  - disease_02933
+  note: '[auto:symptom_led] 先天性耳前瘘管'
+- id: g_05509_name_led
+  question: 曲霉球是什么原因引起的？
+  expected_source_ids:
+  - disease_05509
+  note: '[auto:name_led] 曲霉球'
+- id: g_03106_exam_treat
+  question: 股动脉损伤需要做哪些检查？
+  expected_source_ids:
+  - disease_03106
+  note: '[auto:exam_treat] 股动脉损伤'

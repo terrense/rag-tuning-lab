@@ -3,6 +3,49 @@
 Tracked, quantified history of every RAG configuration we try — so results are
 real numbers, not "it felt better".
 
+Full experiment roadmap (P0 infra → P4 productionization): see [PLAN.md](PLAN.md).
+
+## Statistical significance (read this before believing any delta)
+
+A mean difference on a small eval set is usually noise. Two tools:
+
+```powershell
+# Is run A actually better than run B? Paired permutation test + bootstrap CIs
+& $py -m rag_lab.compare_runs --a v2-bge-embedding --b v2-baseline
+& $py -m rag_lab.compare_runs --a A --b B --stage vector_only --metric mrr
+```
+
+- `LEADERBOARD.md` now shows a bootstrap **95% CI** per run (per-query recall@5),
+  plus an **eval** column — numbers from different eval sets are NOT comparable.
+- Rule of thumb from our own data: at N=10, Recall@5=0.70 has CI [0.40, 1.00];
+  at N=150 the CI narrows to roughly ±0.08. Hence eval set v2.
+
+## Eval set v2 (`data/eval_queries_diseases_v2.yaml`)
+
+119 queries = 10 hand-written anchors + 109 auto-generated:
+department-stratified sampling over the 5942-disease corpus → deepseek-flash
+writes questions in 4 rotating styles (symptom-led / name-led / exam-treatment /
+colloquial) → rule checks (no disease-name leakage in symptom-led, dedup) →
+deepseek-pro cross-model QC (rejected 41, e.g. non-specific symptom combos and
+one corrupted source record). Rebuild: `python -m rag_lab.evalgen --n 150 --seed 42`.
+
+## Generation-stage eval (`rag_lab.gen_eval`)
+
+Retrieval metrics stop at "did the right chunk rank high"; this measures the
+answer itself:
+
+```powershell
+& $py -m rag_lab.gen_eval --config configs/diseases.yaml --limit 20 --label gen-baseline
+& $py -m rag_lab.gen_eval --config configs/diseases.yaml --set llm.roles.generate=deepseek-pro --label gen-pro
+```
+
+- Programmatic: citation_valid (no fabricated [n]), citation_precision /
+  gold_cited (cites the right doc), abstain_correct (honest refusal when
+  retrieval failed).
+- LLM-as-judge: faithfulness / relevance 1-5, judged by `llm.roles.judge`
+  (deepseek-pro) which must differ from the generator — no self-grading.
+- Logged to `experiments/gen_runs.jsonl`.
+
 ## How to run
 
 ```powershell

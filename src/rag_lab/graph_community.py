@@ -67,7 +67,7 @@ def summarize_communities(cfg: dict) -> dict:
         user = "实体：" + "、".join(members[:25]) + "\n关系：\n" + "\n".join(facts[:30])
         try:
             res = call_minimax(cfg, [{"role": "system", "content": sys},
-                                     {"role": "user", "content": user}], max_tokens=300)
+                                     {"role": "user", "content": user}], max_tokens=300, role="graph")
             txt = res["text"]
             s, e = txt.find("{"), txt.rfind("}")
             meta = json.loads(txt[s:e+1]) if s >= 0 else {}
@@ -92,7 +92,7 @@ def global_answer(cfg: dict, query: str) -> str:
            "依据下面各社区的主题摘要，综合回答用户的全局性问题。")
     user = f"问题：{query}\n\n【各社区主题摘要】\n{blocks}\n\n请综合回答。"
     return call_minimax(cfg, [{"role": "system", "content": sys},
-                              {"role": "user", "content": user}], max_tokens=1024)["text"]
+                              {"role": "user", "content": user}], max_tokens=1024, role="graph")["text"]
 
 
 def main() -> None:
