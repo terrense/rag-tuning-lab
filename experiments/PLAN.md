@@ -46,6 +46,37 @@
 | E11 | caption 法优势有边界：图表型语料上 CLIP 应回血 | ChartQA test 子集（已下载 `data/external/chartqa/`）抽 200 图建库，重跑 A/B；给结论画适用边界 |
 | E12 | （等 GPU）ColPali 式页面向量 | 5070 显存空闲时再做 |
 
+### E13 表格结构化提取基准（2026-07-06 立项，第一臂已出数）
+
+**语料**：`scripts/make_table_corpus.py` 合成 5 份化验单，每份精确埋一个坑，
+真值自定义（`data/tables/gt/`）→ 字段级 EM 可程序化打分。三种载体：
+带文本层 PDF（考数字解析）、扫描退化 JPG（考 OCR）、HTML（对照）。
+坑注：Edge 渲的 PDF 被本机透明加密软件写成密文 → 改用 reportlab 纯 Python 生成。
+
+**评估口径**（不报笼统字符准确率）：field_em（字段级，含单位归一化：
+10⁹/10^9、µ/μ、–/-）+ row_acc（行级 6 字段全对）。
+
+**第一臂结果**：pdfplumber 数字解析，naive vs robust（+fill-down、
++跨页表头继承、+数值单位拆分）：
+
+| 表 | 坑 | naive row_acc | robust row_acc |
+|---|---|---|---|
+| t1_merged | 合并单元格 | 0.19 | **1.00** |
+| t2_crosspage | 跨页无表头 | 0.97 | **1.00** |
+| t3_multiheader | 多级表头 | 1.00 | 1.00 |
+| t4_units | 数值单位混排 | 0.00 | **1.00** |
+| t5_misalign | 窄列换行 | 1.00 | 1.00 |
+
+结论①：数字 PDF 的翻车点在**语义还原**（归属、拆分），不在结构识别——
+文本层保住了单元格边界，t3/t5 天然免疫。
+结论②：t3/t5 是专门留给 OCR 臂的（bbox 行列聚类才会断行串列）——
+预期 OCR 臂的失败模式与数字解析**互补**，这正是"评估口径"故事的下半场。
+
+**OCR 臂（待跑，模型已下/环境已建）**：ocr-lab conda env。
+候选：PP-StructureV3（中文表格事实标准）、RapidOCR（轻基线）、
+GOT-OCR2.0（端到端 VLM，权重 1.4G）、DeepSeek-OCR（3B VLM）、
+MinerU（整管线参照，可后补）。统一在 `data/tables/scan/*.jpg` 上跑同一评分器。
+
 ## P4 工程化（生产级故事）
 
 FastAPI 服务（模型常驻 + 流式）→ docker-compose → pytest + smoke eval 进 CI

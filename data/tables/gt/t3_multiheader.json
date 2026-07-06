@@ -1,0 +1,102 @@
+{
+ "table_id": "t3_multiheader",
+ "pitfall": "多级表头：colspan 分组行 + 叶子行，只抽最后一行会丢上级语义",
+ "columns": [
+  "category",
+  "item",
+  "result",
+  "unit",
+  "ref_range",
+  "flag"
+ ],
+ "score_columns": [
+  "category",
+  "item",
+  "result",
+  "unit",
+  "ref_range",
+  "flag"
+ ],
+ "rows": [
+  {
+   "category": "血常规",
+   "item": "白细胞计数(WBC)",
+   "result": "6.2",
+   "unit": "10⁹/L",
+   "ref_range": "3.5–9.5",
+   "flag": ""
+  },
+  {
+   "category": "血常规",
+   "item": "红细胞计数(RBC)",
+   "result": "4.8",
+   "unit": "10¹²/L",
+   "ref_range": "4.3–5.8",
+   "flag": ""
+  },
+  {
+   "category": "血常规",
+   "item": "血红蛋白(HGB)",
+   "result": "128",
+   "unit": "g/L",
+   "ref_range": "130–175",
+   "flag": "↓"
+  },
+  {
+   "category": "血常规",
+   "item": "血小板计数(PLT)",
+   "result": "245",
+   "unit": "10⁹/L",
+   "ref_range": "125–350",
+   "flag": ""
+  },
+  {
+   "category": "血常规",
+   "item": "中性粒细胞百分比",
+   "result": "62.5",
+   "unit": "%",
+   "ref_range": "40–75",
+   "flag": ""
+  },
+  {
+   "category": "血常规",
+   "item": "淋巴细胞百分比",
+   "result": "28.1",
+   "unit": "%",
+   "ref_range": "20–50",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清钾(K)",
+   "result": "4.1",
+   "unit": "mmol/L",
+   "ref_range": "3.5–5.3",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清钠(Na)",
+   "result": "141",
+   "unit": "mmol/L",
+   "ref_range": "137–147",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清氯(Cl)",
+   "result": "103",
+   "unit": "mmol/L",
+   "ref_range": "99–110",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清钙(Ca)",
+   "result": "2.31",
+   "unit": "mmol/L",
+   "ref_range": "2.11–2.52",
+   "flag": ""
+  }
+ ]
+}

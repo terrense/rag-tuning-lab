@@ -1,0 +1,101 @@
+{
+ "table_id": "t4_units",
+ "pitfall": "数值单位分离：同格混排 vs 分离，含上标 10⁹/L、范围 3.9–6.1、阴/阳性",
+ "columns": [
+  "category",
+  "item",
+  "result",
+  "unit",
+  "ref_range",
+  "flag"
+ ],
+ "score_columns": [
+  "item",
+  "result",
+  "unit",
+  "ref_range",
+  "flag"
+ ],
+ "rows": [
+  {
+   "category": "血糖血脂",
+   "item": "空腹血糖(GLU)",
+   "result": "8.5",
+   "unit": "mmol/L",
+   "ref_range": "3.9–6.1",
+   "flag": "↑"
+  },
+  {
+   "category": "血糖血脂",
+   "item": "糖化血红蛋白(HbA1c)",
+   "result": "7.8",
+   "unit": "%",
+   "ref_range": "4.0–6.0",
+   "flag": "↑"
+  },
+  {
+   "category": "血糖血脂",
+   "item": "总胆固醇(TC)",
+   "result": "5.9",
+   "unit": "mmol/L",
+   "ref_range": "2.9–5.2",
+   "flag": "↑"
+  },
+  {
+   "category": "血糖血脂",
+   "item": "甘油三酯(TG)",
+   "result": "2.31",
+   "unit": "mmol/L",
+   "ref_range": "0.45–1.70",
+   "flag": "↑"
+  },
+  {
+   "category": "血糖血脂",
+   "item": "低密度脂蛋白(LDL-C)",
+   "result": "3.8",
+   "unit": "mmol/L",
+   "ref_range": "1.3–3.4",
+   "flag": "↑"
+  },
+  {
+   "category": "肝功能",
+   "item": "丙氨酸氨基转移酶(ALT)",
+   "result": "58",
+   "unit": "U/L",
+   "ref_range": "9–50",
+   "flag": "↑"
+  },
+  {
+   "category": "肝功能",
+   "item": "天冬氨酸氨基转移酶(AST)",
+   "result": "41",
+   "unit": "U/L",
+   "ref_range": "15–40",
+   "flag": "↑"
+  },
+  {
+   "category": "肝功能",
+   "item": "总胆红素(TBIL)",
+   "result": "14.2",
+   "unit": "μmol/L",
+   "ref_range": "3.4–20.4",
+   "flag": ""
+  },
+  {
+   "category": "肝功能",
+   "item": "直接胆红素(DBIL)",
+   "result": "3.8",
+   "unit": "μmol/L",
+   "ref_range": "0–6.8",
+   "flag": ""
+  },
+  {
+   "category": "肝功能",
+   "item": "白蛋白(ALB)",
+   "result": "43.6",
+   "unit": "g/L",
+   "ref_range": "40–55",
+   "flag": ""
+  }
+ ]
+}

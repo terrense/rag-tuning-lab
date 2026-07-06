@@ -1,0 +1,85 @@
+{
+ "table_id": "t5_misalign",
+ "pitfall": "列错位：超长项目名换行 + 空单元格 + 右对齐数字，考行列聚类",
+ "columns": [
+  "category",
+  "item",
+  "result",
+  "unit",
+  "ref_range",
+  "flag"
+ ],
+ "score_columns": [
+  "item",
+  "result",
+  "unit",
+  "ref_range",
+  "flag"
+ ],
+ "rows": [
+  {
+   "category": "免疫检验",
+   "item": "乙型肝炎病毒表面抗原(HBsAg)定量检测",
+   "result": "0.02",
+   "unit": "IU/mL",
+   "ref_range": "<0.05",
+   "flag": "阴性"
+  },
+  {
+   "category": "免疫检验",
+   "item": "乙型肝炎病毒表面抗体(抗-HBs)定量检测",
+   "result": "156.8",
+   "unit": "mIU/mL",
+   "ref_range": ">10为有免疫力",
+   "flag": "阳性"
+  },
+  {
+   "category": "免疫检验",
+   "item": "丙型肝炎病毒抗体(抗-HCV)",
+   "result": "0.08",
+   "unit": "S/CO",
+   "ref_range": "<1.0",
+   "flag": "阴性"
+  },
+  {
+   "category": "免疫检验",
+   "item": "梅毒螺旋体特异性抗体(TP-Ab)",
+   "result": "0.11",
+   "unit": "S/CO",
+   "ref_range": "<1.0",
+   "flag": "阴性"
+  },
+  {
+   "category": "电解质",
+   "item": "血清钾(K)",
+   "result": "4.1",
+   "unit": "mmol/L",
+   "ref_range": "3.5–5.3",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清钠(Na)",
+   "result": "141",
+   "unit": "mmol/L",
+   "ref_range": "137–147",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清氯(Cl)",
+   "result": "103",
+   "unit": "mmol/L",
+   "ref_range": "99–110",
+   "flag": ""
+  },
+  {
+   "category": "电解质",
+   "item": "血清钙(Ca)",
+   "result": "2.31",
+   "unit": "mmol/L",
+   "ref_range": "2.11–2.52",
+   "flag": ""
+  }
+ ]
+}
