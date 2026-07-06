@@ -7,6 +7,7 @@ metrics existed show `-`). Only compare rows with the same eval set!
 
 | Label | eval | When (UTC) | sha | chunk/ovlp | cand_k | bm25_w | rerank | Recall@5 | 95% CI | MRR | nDCG@5 | p50 ms | N |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| v2-bge-small-zh | diseases_v2 | 2026-07-06 11:44 | 59dcaa2 | 360/80 | 50 | 0.6 | cross_encoder | 0.731 | [0.65,0.81] | 0.649 | 1.090 | 3862 | 119 |
 | v2-baseline | diseases_v2 | 2026-07-06 07:39 | 3847634 | 360/80 | 50 | 0.6 | cross_encoder | 0.706 | [0.62,0.79] | 0.559 | 0.860 | 3542 | 119 |
 | cand50_bm25w0.6 | v1 | 2026-06-22 06:32 | c980993 | 360/80 | 50 | 0.6 | cross_encoder | 0.700 | - | 0.550 | 0.675 | 9871 | 10 |
 | tuned-defaults | v1 | 2026-06-22 06:36 | c980993 | 360/80 | 50 | 0.6 | cross_encoder | 0.700 | - | 0.500 | 0.588 | 9021 | 10 |

@@ -184,6 +184,12 @@ def regenerate_leaderboard() -> None:
     if not RUNS_FILE.exists():
         return
     runs = [json.loads(line) for line in RUNS_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # 同 (label, eval_set) 只保留最新一次（指标口径修正后重跑会产生同名 run，
+    # 历史都在 runs.jsonl 里，排行榜只展示每个实验的最新结论）
+    latest: dict[tuple, dict] = {}
+    for run in runs:
+        latest[(run.get("label"), run.get("eval_set", "v1"))] = run
+    runs = list(latest.values())
 
     def pipe_recall5(run: dict) -> float:             # 排序键：完整链路的 Recall@5
         return float(run.get("stages", {}).get("hybrid_rerank", {}).get("recall@5", 0.0))

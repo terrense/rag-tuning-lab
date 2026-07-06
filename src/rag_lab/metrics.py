@@ -60,10 +60,27 @@ def ndcg_at_k(ranked: list[str], expected: set[str], k: int) -> float:
     return 0.0 if idcg == 0 else dcg / idcg
 
 
+def _dedupe_ranked(ranked: list[str]) -> list[str]:
+    """chunk 级排名 → doc 级排名：同一 source_id 只保留首次出现（排名压紧）。
+
+    为什么必须去重：强 embedding 会让同一疾病的多个 chunk 同时挤进 top-k，
+    同一文档在 DCG 里被重复计分，nDCG 会算出 >1 的荒谬值（bge 实验暴露的 bug）。
+    hit/recall 是集合语义不受影响；nDCG/排名类指标必须按"文档只出现一次"算。
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for sid in ranked:
+        if sid not in seen:
+            seen.add(sid)
+            out.append(sid)
+    return out
+
+
 def rank_metrics(
     ranked: list[str], expected: Iterable[str], ks: tuple[int, ...] = DEFAULT_KS
 ) -> dict[str, float | int | None]:
     """一次性算出一道题的全部指标：first_rank、mrr，以及各 k 的 hit/recall/ndcg。"""
+    ranked = _dedupe_ranked(ranked)
     expected_set = set(expected)
     out: dict[str, float | int | None] = {
         "first_rank": _first_rank(ranked, expected_set),

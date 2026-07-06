@@ -72,54 +72,67 @@ def _map_header(cells: list[str | None]) -> dict[int, str] | None:
     return m if len(m) >= 3 else None
 
 
-def extract_pdf(pdf_path: Path, mode: str) -> list[dict]:
-    """返回行 dict 列表。robust 模式做三个修复，naive 什么都不做。"""
-    import pdfplumber
+def grids_to_rows(grids: list[list[list[str | None]]], mode: str) -> list[dict]:
+    """通用：若干"单元格网格"（每页/每表一个）→ 行 dict 列表。
 
+    pdfplumber 臂和 OCR 臂共用这一段（表头识别/列映射/三个 robust 修复），
+    这样两臂的差异就只剩"网格是怎么来的"——对照才干净。
+    """
     rows: list[dict] = []
     colmap: dict[int, str] | None = None       # 跨页继承的列映射（robust）
     last_cat = ""                              # fill-down 记忆（robust）
+    for table in grids:
+        if not table:
+            continue
+        # --- 表头识别 ---
+        hdr = _map_header(table[0])
+        body_start = 1 if hdr else 0
+        if mode == "robust" and len(table) > 1:
+            # 多级表头修复：分组行(row0) × 叶子行(row1) 拼成 "分组/叶子" 再识别。
+            # row0 因 colspan 会有空洞（识别不满 3 列），拼接后叶子列名就齐了。
+            joined = []
+            for i in range(len(table[1])):
+                parent = (table[0][i] or "").strip() if i < len(table[0]) else ""
+                leaf = (table[1][i] or "").strip()
+                joined.append(f"{parent}/{leaf}" if parent and leaf and parent != leaf
+                              else (leaf or parent))
+            hdr2 = _map_header(joined)
+            if hdr2 and len(hdr2) > len(hdr or {}):
+                hdr, body_start = hdr2, 2
+        if hdr:
+            colmap = hdr
+        elif mode == "naive" or colmap is None:
+            # 没认出表头：naive 把 row0 当表头消费掉、其余按位置硬塞 COLS 顺序
+            # （t2 第 2 页的真实翻车方式）；robust 则继承上一页的 colmap。
+            colmap = {i: c for i, c in enumerate(COLS)}
+            body_start = 1 if mode == "naive" else 0
+        # --- 数据行 ---
+        for cells in table[body_start:]:
+            row = {c: "" for c in COLS}
+            for idx, field in colmap.items():
+                if idx < len(cells):
+                    row[field] = (cells[idx] or "").replace("\n", "")
+            if mode == "robust":
+                if row["category"]:
+                    last_cat = row["category"]
+                else:                            # 合并单元格：空 → 沿用上一行大类
+                    row["category"] = last_cat
+                _split_value_unit(row)           # 数值/单位混排修复（t4）
+            rows.append(row)
+    return rows
+
+
+def extract_pdf(pdf_path: Path, mode: str) -> list[dict]:
+    """pdfplumber 臂：逐页 extract_table 得到网格，交给通用逻辑。"""
+    import pdfplumber
+
+    grids = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             table = page.extract_table()
-            if not table:
-                continue
-            # --- 表头识别 ---
-            hdr = _map_header(table[0])
-            body_start = 1 if hdr else 0
-            if mode == "robust" and len(table) > 1:
-                # 多级表头修复：分组行(row0) × 叶子行(row1) 拼成 "分组/叶子" 再识别。
-                # row0 因 colspan 会有空洞（识别不满 3 列），拼接后叶子列名就齐了。
-                joined = []
-                for i in range(len(table[1])):
-                    parent = (table[0][i] or "").strip() if i < len(table[0]) else ""
-                    leaf = (table[1][i] or "").strip()
-                    joined.append(f"{parent}/{leaf}" if parent and leaf and parent != leaf
-                                  else (leaf or parent))
-                hdr2 = _map_header(joined)
-                if hdr2 and len(hdr2) > len(hdr or {}):
-                    hdr, body_start = hdr2, 2
-            if hdr:
-                colmap = hdr
-            elif mode == "naive" or colmap is None:
-                # 没认出表头：naive 把 row0 当表头消费掉、其余按位置硬塞 COLS 顺序
-                # （t2 第 2 页的真实翻车方式）；robust 则继承上一页的 colmap。
-                colmap = {i: c for i, c in enumerate(COLS)}
-                body_start = 1 if mode == "naive" else 0
-            # --- 数据行 ---
-            for cells in table[body_start:]:
-                row = {c: "" for c in COLS}
-                for idx, field in colmap.items():
-                    if idx < len(cells):
-                        row[field] = (cells[idx] or "").replace("\n", "")
-                if mode == "robust":
-                    if row["category"]:
-                        last_cat = row["category"]
-                    else:                        # 合并单元格：空 → 沿用上一行大类
-                        row["category"] = last_cat
-                    _split_value_unit(row)       # 数值/单位混排修复（t4）
-                rows.append(row)
-    return rows
+            if table:
+                grids.append(table)
+    return grids_to_rows(grids, mode)
 
 
 _VAL_UNIT = re.compile(r"^([<>]?\d+(?:\.\d+)?)\s+(\S+)$")
