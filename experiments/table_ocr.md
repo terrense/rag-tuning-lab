@@ -103,8 +103,24 @@ $ocr = "C:/Users/Administrator/miniconda3/envs/ocr-lab/python.exe"          # OC
 & $env:HF_HOME="F:/hf_cache"; & $ocr scripts/ocr_table_eval.py --engine gotocr  # GPU
 ```
 
+## DeepSeek-OCR 臂：环境阻塞（诚实记录）
+
+代码已写好（`grids_dsocr`，VLM→Markdown 解析），权重也下好了，但**未能跑通**：
+DeepSeek-OCR 的自定义 modeling 文件是针对 `transformers ~4.46` 写的，import 了
+`LlamaFlashAttention2` / `is_torch_greater_or_equal_than_1_13` 等一批在 5.x 已被
+重构删除的符号；而同一 ocr-lab 环境里的 GOT-OCR2 依赖 `transformers 5.x`
+（`AutoModelForImageTextToText`）——**两者版本要求直接冲突**。
+
+- 为什么不硬 shim：4.46 时代的 modeling 搬到 5.13 上，attention 接口和 forward
+  签名都变了，补一个符号会连环缺下一个，piecemeal 补不完。
+- 为什么不单开环境：VLM 直出结构这条路线 **GOT-OCR2 已充分代表**（且表现最好），
+  DeepSeek-OCR 只是同类第二个数据点，边际价值低于"再建一个 transformers==4.46 +
+  可能撞 Windows flash-attn 墙"的成本。判断为不值得。
+- 复现前提（若将来要补）：`conda create -n dsocr python=3.11` +
+  `transformers==4.46.3` + torch cu128 + easydict/addict/einops，再跑
+  `scripts/ocr_table_eval.py --engine dsocr`。
+
 ## 待办
 
-- DeepSeek-OCR 臂（权重已下 `F:/hf_cache`）——与 GOT 同为 VLM 路线，补第四条扫描臂。
 - 把最佳表格提取接进 RAG：表格转"Markdown（喂 LLM）+ JSON（字段校验）"双份，
   接 L2 表格问答评测。
