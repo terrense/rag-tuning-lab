@@ -33,6 +33,26 @@
   R@1 0.471→0.605，正确文档被顶到第 1 位。"检索指标要看对指标"本身就是结论。
 - 附带战果：bge 把同一疾病多个 chunk 顶进 top-k，暴露 nDCG>1 的指标 bug（chunk 级排名
   重复计同一文档）→ rank_metrics 先做 doc 级去重，全部同标签重跑覆盖。
+
+**E1-arm3 结论（2026-07-07，GPU，N=119）：bge-m3 vs bge-small-zh，性价比不划算。**
+- vector_only R@5：bge-m3 0.798 vs bge-small 0.782，**+0.017，p=0.69，不显著**（4胜2负113平）。
+- bge-m3 是 560M/2.3GB、需 GPU；bge-small 是 24M/CPU 可跑。**这个语料上多花的算力没换来可测的提升**——
+  典型的"够用就好"，小模型是本项目的正确选择。诚实结论 > 追新。
+- 工程血泪：bge-m3 建库反复卡死，py-spy 定位到 `delete_collection` 卡在删半成品 HNSW；
+  根因是早前 `命令|tail` 吞退出码 → 失败链继续跑 → 留下 20224/27468 的残缺 collection。
+  修复三条固化进 `scripts/gpu_chain.sh`：set -e、不用|tail、每模型独立 chroma_dir。
+
+**E2 结论（2026-07-07，GPU，N=119）：换强 reranker 显著涨排序质量。**
+（三者都在 bge-small 索引 + bm25_w0.3 上；指标 hybrid_rerank MRR）
+| reranker | MRR | R@5 | vs 无精排 p | vs mMiniLM p |
+|---|---|---|---|---|
+| 无精排 | 0.662 | 0.773 | — | — |
+| mMiniLMv2（旧默认） | 0.691 | 0.773 | — | — |
+| **bge-reranker-v2-m3** | **0.718** | **0.790** | **0.0022 显著** | **0.026 显著** |
+- bge-reranker-v2-m3 比无精排 MRR +0.055（p=0.0022，19胜5负），比旧的 mMiniLMv2
+  +0.026（p=0.026，9胜2负）——**精排值得，且强 reranker 值得**。R@1 0.580→0.655。
+- 有意思：精排几乎不动 R@5（对的文档本就在前5），主要把它**顶到第1位**（R@1/MRR 涨）——
+  和 E1 同一课：精排的价值在"排序"不在"召回"，要看对指标。
 | E2 | 更强 reranker 值回延迟成本 | mmarco-mMiniLM vs bge-reranker-v2-m3（GPU）vs 无精排 vs LLM 精排（flash 逐条打分） | R@5 / p50 延迟 / 每查询成本 三维曲线 | v2 基线 |
 | E3 | 检索粒度与生成上下文可以解耦 | chunk 尺寸 sweep；parent-document（小块检索、大块喂 LLM）；句子窗口 | 检索 R@5 + 生成端 faithfulness 同时看 | E0.7 |
 | E4 | metadata 过滤能提精度降延迟 | flash 判科室 → Chroma where 过滤 vs 全库 | R@5、p50、错判科室时的降级表现 | 无 |

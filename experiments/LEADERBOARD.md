@@ -7,8 +7,13 @@ metrics existed show `-`). Only compare rows with the same eval set!
 
 | Label | eval | When (UTC) | sha | chunk/ovlp | cand_k | bm25_w | rerank | Recall@5 | 95% CI | MRR | nDCG@5 | p50 ms | N |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| v2-bge-small-zh | diseases_v2 | 2026-07-06 11:44 | 59dcaa2 | 360/80 | 50 | 0.6 | cross_encoder | 0.731 | [0.65,0.81] | 0.649 | 1.090 | 3862 | 119 |
-| v2-baseline | diseases_v2 | 2026-07-06 07:39 | 3847634 | 360/80 | 50 | 0.6 | cross_encoder | 0.706 | [0.62,0.79] | 0.559 | 0.860 | 3542 | 119 |
+| v2-bge-w0.3-rerankv2 | diseases_v2 | 2026-07-07 02:59 | b1f8b66 | 360/80 | 50 | 0.3 | cross_encoder | 0.790 | [0.71,0.86] | 0.718 | 0.736 | 1189 | 119 |
+| v2-bgem3-w0.3 | diseases_v2 | 2026-07-07 02:52 | b1f8b66 | 360/80 | 50 | 0.3 | cross_encoder | 0.782 | [0.71,0.86] | 0.682 | 0.708 | 726 | 119 |
+| v2-bge-w0.3 | diseases_v2 | 2026-07-06 12:42 | df425aa | 360/80 | 50 | 0.3 | cross_encoder | 0.773 | [0.70,0.85] | 0.691 | 0.712 | 13030 | 119 |
+| v2-bge-w0.3-norerank | diseases_v2 | 2026-07-07 01:47 | b1f8b66 | 360/80 | 50 | 0.3 | none | 0.773 | [0.70,0.85] | 0.662 | 0.690 | 216 | 119 |
+| v2-bge-w0.45 | diseases_v2 | 2026-07-06 13:21 | df425aa | 360/80 | 50 | 0.45 | cross_encoder | 0.765 | [0.69,0.84] | 0.683 | 0.703 | 19433 | 119 |
+| v2-bge-small-zh | diseases_v2 | 2026-07-06 12:08 | df425aa | 360/80 | 50 | 0.6 | cross_encoder | 0.731 | [0.65,0.81] | 0.650 | 0.670 | 3982 | 119 |
+| v2-baseline | diseases_v2 | 2026-07-06 11:58 | df425aa | 360/80 | 50 | 0.6 | cross_encoder | 0.706 | [0.62,0.79] | 0.559 | 0.596 | 3644 | 119 |
 | cand50_bm25w0.6 | v1 | 2026-06-22 06:32 | c980993 | 360/80 | 50 | 0.6 | cross_encoder | 0.700 | - | 0.550 | 0.675 | 9871 | 10 |
 | tuned-defaults | v1 | 2026-06-22 06:36 | c980993 | 360/80 | 50 | 0.6 | cross_encoder | 0.700 | - | 0.500 | 0.588 | 9021 | 10 |
 | rewrite-3layer | v1 | 2026-06-23 08:41 | 3dd30ed | 360/80 | 50 | 0.6 | cross_encoder | 0.700 | - | 0.575 | 0.719 | 11569 | 10 |

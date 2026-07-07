@@ -278,8 +278,58 @@ def grids_gotocr(img: Path) -> list[list[list[str]]]:
     return _latex_tabular_to_grid(text)
 
 
+# ---------------------------------------------------------------------------
+# 引擎 4：DeepSeek-OCR（VLM → Markdown；与 GOT 同为端到端路线，对照第二个 VLM）
+# ---------------------------------------------------------------------------
+_DSOCR = None
+
+
+def _md_table_to_grid(md: str) -> list[list[str]]:
+    """Markdown 管道表 → 网格。跳过 |---|---| 分隔线。"""
+    grid = []
+    for line in md.splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if all(set(c) <= set("-: ") for c in cells):   # 分隔行
+            continue
+        grid.append(cells)
+    return grid
+
+
+def grids_dsocr(img: Path) -> list[list[list[str]]]:
+    global _DSOCR
+    import torch
+    from transformers import AutoModel, AutoTokenizer
+    if _DSOCR is None:
+        name = "deepseek-ai/DeepSeek-OCR"
+        tok = AutoTokenizer.from_pretrained(name, trust_remote_code=True)
+        model = AutoModel.from_pretrained(name, trust_remote_code=True,
+                                          _attn_implementation="eager",
+                                          torch_dtype=torch.bfloat16, use_safetensors=True)
+        model = model.eval().cuda().to(torch.bfloat16)
+        _DSOCR = (tok, model)
+    tok, model = _DSOCR
+    outdir = TDIR / "raw" / "_dsocr_tmp"
+    outdir.mkdir(parents=True, exist_ok=True)
+    prompt = "<image>\n<|grounding|>Convert the document to markdown. "
+    text = model.infer(tok, prompt=prompt, image_file=str(img), output_path=str(outdir),
+                       base_size=1024, image_size=640, crop_mode=True, save_results=False)
+    text = text if isinstance(text, str) else str(text)
+    (TDIR / "raw" / f"{img.stem}_dsocr.txt").write_text(text, encoding="utf-8")
+    if "<table" in text.lower() or "<tr" in text.lower():
+        g = html_to_grid(text)
+        return [g] if g else []
+    if "|" in text:
+        g = _md_table_to_grid(text)
+        if g:
+            return [g]
+    return _latex_tabular_to_grid(text)
+
+
 ENGINES = {"ppstructure": grids_ppstructure, "rapidocr": grids_rapidocr,
-           "gotocr": grids_gotocr}
+           "gotocr": grids_gotocr, "dsocr": grids_dsocr}
 
 # 表 id → 该表的扫描页文件
 def _scan_pages(table_id: str) -> list[Path]:
