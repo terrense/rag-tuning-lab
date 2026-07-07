@@ -1,0 +1,168 @@
+[
+ {
+  "engine": "gotocr",
+  "table": "t1_merged",
+  "mode": "naive",
+  "text_hit": 0.9659090909090909,
+  "n_rows": 16,
+  "row_acc": 0.5,
+  "field_em": {
+   "category": 0.9375,
+   "item": 0.9375,
+   "result": 1.0,
+   "unit": 0.875,
+   "ref_range": 1.0,
+   "flag": 0.75
+  },
+  "field_em_mean": 0.9166666666666666
+ },
+ {
+  "engine": "gotocr",
+  "table": "t1_merged",
+  "mode": "robust",
+  "text_hit": 0.9659090909090909,
+  "n_rows": 16,
+  "row_acc": 0.5625,
+  "field_em": {
+   "category": 1.0,
+   "item": 0.9375,
+   "result": 1.0,
+   "unit": 0.875,
+   "ref_range": 1.0,
+   "flag": 0.75
+  },
+  "field_em_mean": 0.9270833333333334
+ },
+ {
+  "engine": "gotocr",
+  "table": "t2_crosspage",
+  "mode": "naive",
+  "text_hit": 0.9727272727272728,
+  "n_rows": 40,
+  "row_acc": 0.675,
+  "field_em": {
+   "category": 0.975,
+   "item": 0.95,
+   "result": 0.975,
+   "unit": 0.8,
+   "ref_range": 0.975,
+   "flag": 0.85
+  },
+  "field_em_mean": 0.9208333333333333
+ },
+ {
+  "engine": "gotocr",
+  "table": "t2_crosspage",
+  "mode": "robust",
+  "text_hit": 0.9727272727272728,
+  "n_rows": 40,
+  "row_acc": 0.675,
+  "field_em": {
+   "category": 1.0,
+   "item": 0.975,
+   "result": 1.0,
+   "unit": 0.825,
+   "ref_range": 1.0,
+   "flag": 0.85
+  },
+  "field_em_mean": 0.9416666666666667
+ },
+ {
+  "engine": "gotocr",
+  "table": "t3_multiheader",
+  "mode": "naive",
+  "text_hit": 0.9803921568627451,
+  "n_rows": 10,
+  "row_acc": 0.8,
+  "field_em": {
+   "category": 1.0,
+   "item": 1.0,
+   "result": 1.0,
+   "unit": 1.0,
+   "ref_range": 1.0,
+   "flag": 0.8
+  },
+  "field_em_mean": 0.9666666666666667
+ },
+ {
+  "engine": "gotocr",
+  "table": "t3_multiheader",
+  "mode": "robust",
+  "text_hit": 0.9803921568627451,
+  "n_rows": 10,
+  "row_acc": 0.8,
+  "field_em": {
+   "category": 1.0,
+   "item": 1.0,
+   "result": 1.0,
+   "unit": 1.0,
+   "ref_range": 1.0,
+   "flag": 0.8
+  },
+  "field_em_mean": 0.9666666666666667
+ },
+ {
+  "engine": "gotocr",
+  "table": "t4_units",
+  "mode": "naive",
+  "text_hit": 0.9148936170212766,
+  "n_rows": 10,
+  "row_acc": 0.0,
+  "field_em": {
+   "item": 0.9,
+   "result": 0.2,
+   "unit": 0.0,
+   "ref_range": 0.0,
+   "flag": 1.0
+  },
+  "field_em_mean": 0.42
+ },
+ {
+  "engine": "gotocr",
+  "table": "t4_units",
+  "mode": "robust",
+  "text_hit": 0.9148936170212766,
+  "n_rows": 10,
+  "row_acc": 0.5,
+  "field_em": {
+   "item": 0.9,
+   "result": 0.9,
+   "unit": 0.6,
+   "ref_range": 0.8,
+   "flag": 1.0
+  },
+  "field_em_mean": 0.84
+ },
+ {
+  "engine": "gotocr",
+  "table": "t5_misalign",
+  "mode": "naive",
+  "text_hit": 1.0,
+  "n_rows": 8,
+  "row_acc": 1.0,
+  "field_em": {
+   "item": 1.0,
+   "result": 1.0,
+   "unit": 1.0,
+   "ref_range": 1.0,
+   "flag": 1.0
+  },
+  "field_em_mean": 1.0
+ },
+ {
+  "engine": "gotocr",
+  "table": "t5_misalign",
+  "mode": "robust",
+  "text_hit": 1.0,
+  "n_rows": 8,
+  "row_acc": 1.0,
+  "field_em": {
+   "item": 1.0,
+   "result": 1.0,
+   "unit": 1.0,
+   "ref_range": 1.0,
+   "flag": 1.0
+  },
+  "field_em_mean": 1.0
+ }
+]

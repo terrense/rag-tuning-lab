@@ -24,6 +24,15 @@
 | # | 假设 | 变量 | 判定指标 | 依赖 |
 |---|---|---|---|---|
 | E1 | 中文专用 embedding 大幅提升向量路（现 vector-only R@5≈0.20） | MiniLM-多语 vs **bge-small-zh-v1.5**（CPU 可跑）vs bge-m3（等 GPU） | vector_only 与 hybrid_rerank 的 R@5/MRR + p 值；顺带重扫 bm25_weight（向量变强后最优权重应回落） | 无 |
+
+**E1/E1b 结论（2026-07-06/07，N=119，全部 compare_runs 配对置换检验）：**
+- vector_only R@5：MiniLM 0.319 → bge-small-zh **0.765**（+0.445，p=0.0001，53胜0负）——换中文 embedding 是决定性提升。
+- 权重重扫应验预言：bm25_weight 0.6（为弱向量调的）→ 0.3 最优；管线 R@5 0.706→0.773。
+- 诚实的细颗粒结论：**管线端 R@5 提升不显著**（+0.067，p=0.09）——旧管线本来就能把对的文档
+  捞进前5；真正的质变在**排序**：MRR 0.559→0.691（**+0.132，p=0.0001，36胜7负**），
+  R@1 0.471→0.605，正确文档被顶到第 1 位。"检索指标要看对指标"本身就是结论。
+- 附带战果：bge 把同一疾病多个 chunk 顶进 top-k，暴露 nDCG>1 的指标 bug（chunk 级排名
+  重复计同一文档）→ rank_metrics 先做 doc 级去重，全部同标签重跑覆盖。
 | E2 | 更强 reranker 值回延迟成本 | mmarco-mMiniLM vs bge-reranker-v2-m3（GPU）vs 无精排 vs LLM 精排（flash 逐条打分） | R@5 / p50 延迟 / 每查询成本 三维曲线 | v2 基线 |
 | E3 | 检索粒度与生成上下文可以解耦 | chunk 尺寸 sweep；parent-document（小块检索、大块喂 LLM）；句子窗口 | 检索 R@5 + 生成端 faithfulness 同时看 | E0.7 |
 | E4 | metadata 过滤能提精度降延迟 | flash 判科室 → Chroma where 过滤 vs 全库 | R@5、p50、错判科室时的降级表现 | 无 |

@@ -94,8 +94,11 @@ def grids_ppstructure(img: Path) -> list[list[list[str]]]:
     global _PP_PIPE
     from paddleocr import PPStructureV3
     if _PP_PIPE is None:
-        # 扫描件有旋转 → 打开方向分类；unwarp 对平扫没必要
-        _PP_PIPE = PPStructureV3(use_doc_orientation_classify=True, use_doc_unwarping=False)
+        # 扫描件有旋转 → 打开方向分类；unwarp 对平扫没必要。
+        # enable_mkldnn=False：paddlepaddle 3.x Windows 的 PIR+oneDNN 执行器
+        # 会抛 ConvertPirAttribute2RuntimeAttribute NotImplementedError。
+        _PP_PIPE = PPStructureV3(use_doc_orientation_classify=True, use_doc_unwarping=False,
+                                 device="cpu", enable_mkldnn=False)
     grids = []
     for res in _PP_PIPE.predict(str(img)):
         d = res.json if isinstance(res.json, dict) else {}
@@ -159,7 +162,124 @@ def grids_rapidocr(img: Path) -> list[list[list[str]]]:
     return [grid]
 
 
-ENGINES = {"ppstructure": grids_ppstructure, "rapidocr": grids_rapidocr}
+# ---------------------------------------------------------------------------
+# 引擎 3：GOT-OCR2.0（端到端 VLM：图 → 带格式文本，表格输出 LaTeX/HTML）
+# ---------------------------------------------------------------------------
+_GOT = None
+
+
+def _clean_latex_math(s: str) -> str:
+    """GOT 把单位/数值包在数学模式里：\\(10^{\\sim}9/\\mathrm{L}\\) → 10^9/L。
+    逐条还原成 GT 用的普通文本（GT 用 10^9/L、↑↓、μ）。"""
+    s = s.replace(r"\(", "").replace(r"\)", "").replace("$", "")
+    s = s.replace(r"\downarrow", "↓").replace(r"\uparrow", "↑")
+    s = s.replace(r"\sim", "").replace("~", "")            # 10^{\sim}9 里的 ~ 是识别噪声
+    s = re.sub(r"\\mathrm\s*\{([^}]*)\}", r"\1", s)
+    s = re.sub(r"\\text\s*\{([^}]*)\}", r"\1", s)
+    s = re.sub(r"\^\{([^}]*)\}", r"^\1", s)                # 10^{9} → 10^9
+    s = re.sub(r"_\{([^}]*)\}", r"\1", s)
+    s = re.sub(r"\\[a-zA-Z]+", "", s)                      # 其余残留控制序列
+    s = s.replace("{", "").replace("}", "").replace("\\", "")
+    return re.sub(r"\s+", "", s).strip()
+
+
+def _split_cells(line: str) -> list[str]:
+    """按未转义的 & 分列（表格里的 & 都是列分隔；GT 文本不含 &）。"""
+    return [c.strip() for c in line.split("&")]
+
+
+def _latex_tabular_to_grid(tex: str) -> list[list[str]]:
+    r"""\begin{tabular} 块 → 网格。处理 \multicolumn（横向展开）、
+    \multirow（纵向填充：值写满该列的 N 行，等价 fill-down）、数学模式清洗、
+    以及单元格里嵌套 tabular（t5 的换行会被 GOT 表示成小 tabular，取其文本拼接）。"""
+    grids = []
+    # 最外层 tabular（用计数配对，避免嵌套 tabular 提前闭合）
+    depth, start = 0, None
+    blocks = []
+    for m in re.finditer(r"\\(begin|end)\{tabular\}", tex):
+        if m.group(1) == "begin":
+            if depth == 0:
+                start = m.end()
+            depth += 1
+        else:
+            depth -= 1
+            if depth == 0 and start is not None:
+                blocks.append(tex[start:m.start()])
+    for body in blocks:
+        # 去掉列格式说明 {|c|c|...}（紧跟 \begin{tabular} 的那段），行线
+        body = re.sub(r"^\s*\{[^{}]*\}", "", body)
+        body = re.sub(r"\\[hc]line(\[[^]]*\])?", "", body)
+        # 先把嵌套 tabular 压平成其纯文本（消除内部 \\ 和 & 的干扰）
+        body = re.sub(r"\\begin\{tabular\}\{[^}]*\}(.*?)\\end\{tabular\}",
+                      lambda mm: _clean_latex_math(mm.group(1).replace("&", "").replace(r"\\", "")),
+                      body, flags=re.DOTALL)
+        grid: list[list[str]] = []
+        # multirow 续行填充：LaTeX 对被跨的列会留一个空占位 &，所以按"列位置"
+        # 记忆值，续行在该列遇到空格时回填（不能自动插值，否则整行右移）。
+        active: dict[int, tuple[int, str]] = {}   # 列位置 → (剩余续行数, 值)
+        for raw in re.split(r"\\\\", body):
+            raw = raw.strip()
+            if not raw:
+                continue
+            row: list[str] = []
+            for cell in _split_cells(raw):
+                col = len(row)
+                mr = re.match(r"\\multirow\{(-?\d+)\}\{[^}]*\}\{(.*)\}$", cell, re.DOTALL)
+                mc = re.match(r"\\multicolumn\{(\d+)\}\{[^}]*\}\{(.*)\}$", cell, re.DOTALL)
+                if mr:
+                    val = _clean_latex_math(mr.group(2))
+                    row.append(val)
+                    if abs(int(mr.group(1))) > 1:
+                        active[col] = (abs(int(mr.group(1))) - 1, val)
+                elif mc:
+                    row.append(_clean_latex_math(mc.group(2)))
+                    row.extend([""] * (int(mc.group(1)) - 1))
+                else:
+                    val = _clean_latex_math(cell)
+                    if not val and col in active:      # 空占位 + 该列有活跃 multirow → 回填
+                        n, v = active[col]
+                        val = v
+                        active[col] = (n - 1, v) if n - 1 > 0 else None  # type: ignore
+                        if active[col] is None:
+                            del active[col]
+                    row.append(val)
+            grid.append(row)
+        if grid:
+            grids.append(grid)
+    return grids
+
+
+def grids_gotocr(img: Path) -> list[list[list[str]]]:
+    global _GOT
+    import torch
+    from transformers import AutoModelForImageTextToText, AutoProcessor
+    if _GOT is None:
+        name = "stepfun-ai/GOT-OCR-2.0-hf"
+        proc = AutoProcessor.from_pretrained(name)
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        model = AutoModelForImageTextToText.from_pretrained(
+            name, torch_dtype=torch.bfloat16 if dev == "cuda" else torch.float32,
+            device_map=dev)
+        _GOT = (proc, model, dev)
+    proc, model, dev = _GOT
+    from PIL import Image
+    image = Image.open(img).convert("RGB")
+    import torch
+    inputs = proc(image, return_tensors="pt", format=True).to(dev)   # format=True → 结构化输出
+    with torch.no_grad():
+        ids = model.generate(**inputs, do_sample=False, max_new_tokens=4096,
+                             tokenizer=proc.tokenizer, stop_strings="<|im_end|>")
+    text = proc.decode(ids[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+    (TDIR / "raw").mkdir(exist_ok=True)
+    (TDIR / "raw" / f"{img.stem}_got.txt").write_text(text, encoding="utf-8")
+    if "<table" in text.lower() or "<tr" in text.lower():
+        g = html_to_grid(text)
+        return [g] if g else []
+    return _latex_tabular_to_grid(text)
+
+
+ENGINES = {"ppstructure": grids_ppstructure, "rapidocr": grids_rapidocr,
+           "gotocr": grids_gotocr}
 
 # 表 id → 该表的扫描页文件
 def _scan_pages(table_id: str) -> list[Path]:

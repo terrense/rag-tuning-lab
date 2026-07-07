@@ -135,19 +135,21 @@ def extract_pdf(pdf_path: Path, mode: str) -> list[dict]:
     return grids_to_rows(grids, mode)
 
 
-_VAL_UNIT = re.compile(r"^([<>]?\d+(?:\.\d+)?)\s+(\S+)$")
+# 单个数值 + 紧跟单位（可有可无空格）。数值不含范围号，避免误拆 "3.9-6.1"。
+_VAL_UNIT = re.compile(r"^([<>]?\d+(?:\.\d+)?)\s*([^\d\s].*)$")
 
 
 def _split_value_unit(row: dict) -> None:
-    """t4 修复：结果格里 "8.5 mmol/L" → result=8.5, unit=mmol/L；
-    参考范围尾巴上的单位一并剥掉（"3.9-6.1 mmol/L" → "3.9-6.1"）。"""
+    """t4 修复：结果格里 "8.5 mmol/L" / "8.5mmol/L" → result=8.5, unit=mmol/L；
+    参考范围尾巴上的单位一并剥掉（"3.9-6.1 mmol/L" → "3.9-6.1"）。
+    OCR 臂里数学清洗会吃掉空格，所以拆分不能依赖空格。"""
     if not row.get("unit"):
         m = _VAL_UNIT.match((row.get("result") or "").strip())
         if m:
-            row["result"], row["unit"] = m.group(1), m.group(2)
+            row["result"], row["unit"] = m.group(1), m.group(2).strip()
     unit = (row.get("unit") or "").strip()
     ref = (row.get("ref_range") or "").strip()
-    if unit and ref.endswith(unit):
+    if unit and ref.endswith(unit):        # 参考范围尾部重复的单位剥掉
         row["ref_range"] = ref[: -len(unit)].strip()
 
 

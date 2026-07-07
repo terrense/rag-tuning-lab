@@ -1,0 +1,14 @@
+\begin{tabular}{|l|l|c|c|c|}
+\hline 肝功能 & 天冬氨酸氨基转移酶 (AST) & 41 & \(U / L\) & \(15-40\) \\
+\hline 肝功能 & 总胆红素 (TBIL) & 14.2 & \(\mu \mathrm{mol} / \mathrm{L}\) & \(3.4-20.4\) \\
+\hline 肝功能 & 直接胆红素 (DBIL) & 3.8 & \(\mu \mathrm{mol} / \mathrm{L}\) & \(0-6.8\) \\
+\hline 肝功能 & 白蛋白 (ALB) & 43.6 & \(\mathrm{~g} / \mathrm{L}\) & \(40-55\) \\
+\hline 血糖血脂 & 空腹血糖 (GLU) & 8.5 & \(\mathrm{mmol} / \mathrm{L}\) & \(3.9-6.1\) \\
+\hline 血糖血脂 & 糖化血红蛋白 (HbA1c) & 7.8 & \(\%\) & \(4.0-6.0\) \\
+\hline 血糖血脂 & 总胆固醇 (TC) & 5.9 & \(\mathrm{mmol} / \mathrm{L}\) & \(2.9-5.2\) \\
+\hline 血糖血脂 & 甘油三酯 (TG) & 2.31 & \(\mathrm{mmol} / \mathrm{L}\) & \(0.45-1.70\) \\
+\hline 血糖血脂 & 低密度脂蛋白 (LDL-C) & 3.8 & \(\mathrm{mmol} / \mathrm{L}\) & \(1.3-3.4\) \\
+\hline
+\end{tabular}
+
+检验者: 李某 审核者: 张某 本报告仅对该标本负责。 
