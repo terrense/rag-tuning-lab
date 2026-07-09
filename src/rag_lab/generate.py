@@ -79,7 +79,18 @@ def _figure_images(hits: list[SearchHit], limit: int) -> list[str]:
 def _build_messages(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> tuple[list[dict], list[dict], list[str]]:
     """拼装 system+user 消息（可能带配图），返回 (messages, sources, images)。"""
     gen_cfg = cfg.get("generation", {})
-    context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
+    # Parent-Document：小块检索、整篇父文档喂 LLM（generation.parent_document=true）
+    if bool(gen_cfg.get("parent_document", False)):
+        from rag_lab.config import get_path
+        from rag_lab.parent_doc import build_parent_context
+        from rag_lab.pipeline import _get_retrieval_assets
+        all_chunks, chunk_lookup, _ = _get_retrieval_assets(get_path(cfg, "chunks_cache"))
+        context, sources = build_parent_context(
+            hits, chunk_lookup, all_chunks,
+            max_chars=int(gen_cfg.get("parent_max_chars", 1500)),
+            max_parents=int(gen_cfg.get("parent_max_docs", 5)))
+    else:
+        context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
     user_prompt = (
         f"问题：{query}\n\n"
         f"【资料】\n{context}\n\n"

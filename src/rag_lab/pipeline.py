@@ -57,6 +57,12 @@ def ingest_config(cfg: dict[str, Any]) -> dict[str, Any]:
     docs, source_counts = load_corpus(cfg)
     # 2) 切块：每个文档切成若干 chunk（受 chunking.* 配置控制）
     chunks = make_chunks(docs, cfg)
+    # 2.5) Contextual Retrieval：可选，给每个块加 LLM 生成的上下文前缀再 embedding
+    if bool(cfg.get("chunking", {}).get("contextual", False)):
+        from rag_lab.contextual import augment_chunks
+        info = augment_chunks(cfg, chunks, docs,
+                              max_chunks=int(cfg["chunking"].get("contextual_max_chunks", 0)))
+        print(f"[contextual] {info}")
     # 3) 拿到 embedding 模型，把每个 chunk 的文本批量变成向量
     embedder = get_embedder(cfg)
     embeddings = embedder.embed([chunk.text for chunk in chunks])

@@ -46,6 +46,8 @@ DEFAULT_ROLES: dict[str, str] = {
     "judge": "deepseek-pro",  # LLM-as-judge（裁判 ≠ 生成者）
     "filter": "deepseek-pro", # 评测集质检过滤
     "evalgen": "deepseek-flash",  # 批量生成评测问题（量大、任务简单）
+    "crag": "deepseek-flash", # CRAG 检索相关性打分（量大、任务简单 → 便宜模型）
+    "contextual": "deepseek-flash",  # Contextual Retrieval 分块上下文生成（量极大 → 最便宜）
 }
 
 
