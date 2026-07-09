@@ -76,44 +76,59 @@ def _figure_images(hits: list[SearchHit], limit: int) -> list[str]:
     return paths
 
 
-def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> dict[str, Any]:
-    """给定问题 + 检索到的块，调 MiniMax M3 生成带引用的答案。
-
-    若命中里有“配图”块，则把真实图片一并喂给 M3（图文联合回答 / 真·多模态）。
-    """
+def _build_messages(cfg: dict[str, Any], query: str, hits: list[SearchHit]) -> tuple[list[dict], list[dict], list[str]]:
+    """拼装 system+user 消息（可能带配图），返回 (messages, sources, images)。"""
     gen_cfg = cfg.get("generation", {})
-    # 拼 user 提示：问题 + 资料区块
     context, sources = build_context(hits, max_chars=int(gen_cfg.get("context_chars", 600)))
     user_prompt = (
         f"问题：{query}\n\n"
         f"【资料】\n{context}\n\n"
         "请只依据以上资料（含图片）回答，并在关键结论后标注引用编号。"
     )
-
-    # 收集命中的配图图片（可开关、限量）
     images: list[str] = []
     if bool(gen_cfg.get("use_figure_images", True)):
         images = _figure_images(hits, int(gen_cfg.get("max_figure_images", 3)))
-
     if images:
-        # 多模态消息：文字 + 若干图片
         import base64
         content: list[dict] = [{"type": "text", "text": user_prompt}]
         for p in images:
             data = base64.b64encode(open(p, "rb").read()).decode("ascii")
             content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{data}"}})
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": content}]
-        try:
-            out = call_minimax(cfg, messages)
-        except Exception:
-            # 图片让请求失败（如尺寸不被接受）就退回纯文字
-            messages = [{"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt}]
-            out = call_minimax(cfg, messages)
-            images = []
     else:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_prompt}]
-        out = call_minimax(cfg, messages)
+    return messages, sources, images
+
+
+def generate_answer(cfg: dict[str, Any], query: str, hits: list[SearchHit],
+                    trace: Any = None) -> dict[str, Any]:
+    """给定问题 + 检索到的块，生成带引用的答案。
+
+    若命中里有“配图”块，则把真实图片一并喂给模型（图文联合回答 / 真·多模态）。
+    trace：可选，传入则记 token 用量。
+    """
+    from rag_lab.llm import chat
+
+    messages, sources, images = _build_messages(cfg, query, hits)
+    if images:
+        try:
+            out = chat(cfg, messages, role="generate", trace=trace)
+        except Exception:
+            # 图片让请求失败（如尺寸不被接受）就退回纯文字
+            text_msgs, sources, _ = _build_messages({**cfg, "generation": {**cfg.get("generation", {}), "use_figure_images": False}}, query, hits)
+            out = chat(cfg, text_msgs, role="generate", trace=trace)
+            images = []
+    else:
+        out = chat(cfg, messages, role="generate", trace=trace)
 
     return {"answer": out["text"], "sources": sources, "model": out["model"],
             "raw_usage": out["usage"], "images_used": images}
+
+
+def generate_answer_stream(cfg: dict[str, Any], query: str, hits: list[SearchHit],
+                           trace: Any = None):
+    """流式生成：逐块 yield 答案文本（SSE 用）。配图场景退回一次性返回。"""
+    from rag_lab.llm import chat_stream
+
+    messages, _sources, _images = _build_messages(cfg, query, hits)
+    yield from chat_stream(cfg, messages, role="generate", trace=trace)
