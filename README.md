@@ -19,8 +19,12 @@
 | **② 多模态 RAG** | 图 / 表 问答 | 文字 + 表格(Markdown) + 配图(M3视觉描述)；回答时把真实图喂回 M3 | `configs/docs.yaml` |
 | **③ GraphRAG** | 多跳关系 / 全局概览 | 抽三元组 → 知识图 + 实体消歧 → 图遍历 / 社区摘要 | `rag_lab.graph_*` |
 
-并配套两类**进阶检索技法**：三层 **query 改写**（规则 / 传统NLP / LLM）、
-**CLIP 图向量 vs 描述法**对比实验。
+并配套多类**进阶检索技法**：三层 **query 改写**（规则 / 传统NLP / LLM）、
+**CLIP 图向量 vs 描述法**对比、**CRAG 检索自纠错**、**Parent-Document / Contextual
+Retrieval**、**表格/OCR 四臂基准**（见 `experiments/`）。
+
+**生产服务层**（`rag_lab.serve`）：FastAPI 常驻服务，`/ask` `/search` `/ask/stream`(SSE)，
+分阶段 tracing（延迟+token+成本）、语义缓存（命中快 ~270 倍）。见 `experiments/serving.md`。
 
 ---
 
