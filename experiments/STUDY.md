@@ -142,60 +142,68 @@
 
 ## 8. 亲手跑一遍（直观感受）
 
+**⚠ 每次开新的 PowerShell 窗口，先跑这三行**（关键：项目装在 `rag-tuning-lab`
+环境里，不是 `base`；不激活就会报 `No module named 'rag_lab'`）：
 ```powershell
-# —— 环境（每次开 powershell 先设）——
-$py = "C:/Users/Administrator/miniconda3/envs/rag-tuning-lab/python.exe"
-$env:PYTHONIOENCODING = "utf-8"      # 中文不乱码
-$env:HF_HOME = "F:/hf_cache"         # 模型缓存在 F 盘
+conda activate rag-tuning-lab        # ← 最容易忘的一步！base 环境里跑不了
+$env:PYTHONIOENCODING = "utf-8"       # 中文不乱码
+$env:HF_HOME = "F:/hf_cache"          # 模型缓存在 F 盘
 cd F:\RAG_experiment
 ```
+> 激活后命令行前缀会从 `(base)` 变成 `(rag-tuning-lab)`，之后直接用 `python`。
 
 ### A. 感受检索（最快，无需 LLM）
 ```powershell
-& $py -m rag_lab.query --config configs/diseases.yaml --query "大脚趾夜里剧痛红肿尿酸高"
+python -m rag_lab.query --config configs/diseases.yaml --query "大脚趾夜里剧痛红肿尿酸高"
 # 看它把"痛风/高尿酸血症"排上来；改 --query 试各种症状描述
 ```
 
 ### B. 感受带引用的生成
 ```powershell
-& $py -m rag_lab.ask --config configs/diseases.yaml --query "苯中毒的症状和检查"
+python -m rag_lab.ask --config configs/diseases.yaml --query "苯中毒的症状和检查"
 # 答案后带 [1][2] 引用编号，可溯源
 ```
 
 ### C. 感受统计显著性（本项目的灵魂）
 ```powershell
-& $py -m rag_lab.compare_runs --a v2-bge-w0.3-rerankv2 --b v2-baseline --stage hybrid_rerank --metric mrr
+python -m rag_lab.compare_runs --a v2-bge-w0.3-rerankv2 --b v2-baseline --stage hybrid_rerank --metric mrr
 # 看它输出 mean diff + p 值 + 逐题胜负。p<0.05 才算真提升
 type experiments\LEADERBOARD.md    # 排行榜，每行带 95% CI
 ```
 
 ### D. 感受生产服务层（开两个终端）
 ```powershell
-# 终端1：起服务（模型常驻，启动约 30s）
-& $py -m rag_lab.serve --config configs/diseases.yaml --port 8000
+# 终端1（先激活 rag-tuning-lab 环境）：起服务，模型常驻，启动约 30s
+python -m rag_lab.serve --config configs/diseases.yaml --port 8000
 
-# 终端2：打请求（换个终端，同样先设 $py）
-& $py -c "import requests; print(requests.post('http://127.0.0.1:8000/ask', json={'query':'哮喘怎么检查'}).json()['trace'])"
-# 看 trace：各阶段延迟 + token + 成本
-& $py -c "import requests; requests.post('http://127.0.0.1:8000/ask', json={'query':'哮喘怎么检查'}); print(requests.get('http://127.0.0.1:8000/metrics').json())"
-# 第二次同问 → 看 /metrics 里 cache 命中；浏览器开 http://127.0.0.1:8000/docs 有交互式 API 文档
+# 然后浏览器直接开 http://127.0.0.1:8000/docs —— FastAPI 自带交互式文档，
+# 点 /ask 的 "Try it out" 输入 {"query":"哮喘怎么检查"} 就能看 trace/cache，最直观。
+
+# 或终端2（也要先 conda activate rag-tuning-lab）用命令行打：
+python -c "import requests; print(requests.post('http://127.0.0.1:8000/ask', json={'query':'哮喘怎么检查'}).json()['trace'])"
+python -c "import requests; print(requests.get('http://127.0.0.1:8000/metrics').json())"   # 同问第二次看 cache 命中
 ```
 
 ### E. 感受 CRAG 诚实拒答
 ```powershell
-& $py -m rag_lab.crag --config configs/diseases.yaml --set source.structured_max_records=0 --query "如何用Python写快速排序"
+python -m rag_lab.crag --config configs/diseases.yaml --set source.structured_max_records=0 --query "如何用Python写快速排序"
 # 语料里没有 → decision=abstain，诚实说"无法确定"，不硬编
-& $py -m rag_lab.crag --config configs/diseases.yaml --set source.structured_max_records=0 --query "痛风怎么治"
+python -m rag_lab.crag --config configs/diseases.yaml --set source.structured_max_records=0 --query "痛风怎么治"
 # 有 → decision=proceed
 ```
 
 ### F. 感受表格/OCR 基准
 ```powershell
-& $py scripts/table_eval.py     # 数字PDF：naive vs robust，看修复把 t1 0.19→1.00
-# OCR 臂要用 ocr-lab 环境：
-$ocr = "C:/Users/Administrator/miniconda3/envs/ocr-lab/python.exe"
-& $ocr scripts/ocr_table_eval.py --engine rapidocr   # 看 text_hit 高但 field_em 低
+python scripts/table_eval.py     # 数字PDF：naive vs robust，看修复把 t1 0.19→1.00
+# OCR 臂要换 ocr-lab 环境：
+conda activate ocr-lab
+python scripts/ocr_table_eval.py --engine rapidocr   # 看 text_hit 高但 field_em 低
+conda activate rag-tuning-lab    # 跑完记得切回来
 ```
 
 > 建议顺序：先 A/B（看检索和生成），再 C（理解为什么要显著性），再 D（生产服务），
 > 最后 E/F（进阶）。每一步的详细文档在 `experiments/` 对应的 .md 里。
+>
+> **踩坑速查**：报 `No module named 'rag_lab'` = 没激活 rag-tuning-lab 环境；
+> 报 `py 无法识别` = 别输 `py`，本文档已改用 `python`；`$py 无效对象` = 那是旧写法，
+> 现在不用变量了，直接 `python`。
