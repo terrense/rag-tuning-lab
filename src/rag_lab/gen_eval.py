@@ -148,23 +148,39 @@ def main() -> None:
         row = {"id": item.get("id"), "latency_ms": latency_ms}
         row.update(citation_metrics(answer, sources, expected))
         if not args.no_judge:
-            context, _ = build_context(result["hits"],
-                                       max_chars=int(cfg.get("generation", {}).get("context_chars", 600)))
-            row.update(judge_answer(cfg, q, context, answer))
+            # 裁判必须看"答案实际生成时用的那份上下文"——parent 模式下是父文档，
+            # 否则裁判把父文档里的正确信息误判成"无依据"，不公平地压低 parent 分。
+            from rag_lab.generate import _build_messages
+            gen_msgs, _, _ = _build_messages(cfg, q, result["hits"])
+            uc = gen_msgs[1]["content"]
+            judge_ctx = uc if isinstance(uc, str) else uc[0].get("text", "")
+            try:                                    # 单次裁判失败(限流/超时)不该拖垮全局
+                row.update(judge_answer(cfg, q, judge_ctx, answer))
+            except Exception as exc:
+                print(f"  [judge] call failed ({type(exc).__name__}), skipping this row")
+                row.update({"faithfulness": 0.0, "relevance": 0.0, "judge_parse_ok": False})
         rows.append(row)
         print(f"[{i}/{len(queries)}] {item.get('id')}: cite_p={row['citation_precision']:.2f} "
               + (f"faith={row.get('faithfulness', 0):.0f} rel={row.get('relevance', 0):.0f}"
                  if not args.no_judge else "") )
 
-    def _mean(key: str) -> float:
-        vals = [float(r[key]) for r in rows if r.get(key) is not None]
+    # 裁判解析失败的行（judge 返回空/坏 JSON）是"测量失败"，不是"质量 0 分"——
+    # 算 faithfulness/relevance 均值时必须剔除，否则 API 抖动会污染结论。
+    judged = [r for r in rows if r.get("judge_parse_ok")]
+    n_judge_fail = sum(1 for r in rows if "judge_parse_ok" in r and not r["judge_parse_ok"])
+
+    def _mean(key: str, source: list[dict]) -> float:
+        vals = [float(r[key]) for r in source if r.get(key) is not None]
         return sum(vals) / len(vals) if vals else 0.0
 
-    summary_keys = ["citation_valid", "citation_precision", "gold_cited", "abstain_correct"]
+    summary = {k: _mean(k, rows) for k in
+               ["citation_valid", "citation_precision", "gold_cited", "abstain_correct"]}
     if not args.no_judge:
-        summary_keys += ["faithfulness", "relevance"]
-    summary = {k: _mean(k) for k in summary_keys}
-    faith_vals = [r["faithfulness"] for r in rows if "faithfulness" in r]
+        summary["faithfulness"] = _mean("faithfulness", judged)
+        summary["relevance"] = _mean("relevance", judged)
+        summary["judge_ok"] = len(judged)
+        summary["judge_failed"] = n_judge_fail
+    faith_vals = [r["faithfulness"] for r in judged if "faithfulness" in r]
     if faith_vals:
         _, lo, hi = bootstrap_ci(faith_vals)
         summary["faithfulness_ci"] = [round(lo, 2), round(hi, 2)]

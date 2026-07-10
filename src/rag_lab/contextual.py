@@ -76,9 +76,11 @@ def augment_chunks(cfg: dict[str, Any], chunks: list[Chunk], docs: list[dict[str
         ck = _key(sid, c.text)
         ctx = cache.get(ck)
         if ctx is None:
+            # max_tokens 要给足：flash 是推理模型，会先输出 <think>，给太少（如 80）
+            # 会被思考全部吃光、剥离后为空。400 够装思考 + 一句上下文。
             out = chat(cfg, [{"role": "system", "content": _SYS},
                              {"role": "user", "content": _doc_brief(doc) + f"\n\n片段：\n{c.text[:400]}"}],
-                       role="contextual", max_tokens=80, temperature=0.0)
+                       role="contextual", max_tokens=400, temperature=0.0)
             ctx = out["text"].strip().replace("\n", " ")
             cache[ck] = ctx
             n_llm += 1

@@ -48,3 +48,5 @@ storage/evalgen_cache.json
 # Service traces
 logs/
 storage/semantic_cache.jsonl
+
+storage/contextual_cache.json
